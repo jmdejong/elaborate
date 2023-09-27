@@ -133,11 +133,7 @@ class World {
 		noise.SetFractalOctaves(8);
 		noise.SetFrequency(frequency);
 		for (let node of this.nodes.values()) {
-			node.height += noise.GetNoise(node.pos.x, node.pos.y) * amplitude + base
-			// let d = Math.min(Math.min(node.pos.x, this.size.x - node.pos.x), Math.min(node.pos.y, this.size.y - node.pos.y));
-			// if (d < edge) {
-			// 	node.height = -0.5 + (0.5 + node.height) * d / edge;
-			// }
+			node.height += noise.GetNoise(node.pos.x, node.pos.y) * amplitude + base;
 		}
 	}
 
@@ -165,8 +161,6 @@ class World {
 				if (!visited.has(neighbour.id.hash())) {
 					if (neighbour.height < node.height) {
 						neighbour.height = node.height + randf(neighbour.id, 3627) * 0.001;
-					} else {
-						// neighbour.height -= 0.1 * (neighbour.height - node.height);
 					}
 					if (!neighbour.isSea()) {
 						neighbour.drain = node.id;
@@ -179,12 +173,13 @@ class World {
 	}
 
 	drain(w) {
+		let nodes = Array.from(this.nodes.values()).filter(node => !node.isSea())
+		nodes.sort((a, b) => b.height - a.height);
 		let wetness = w *this.ns*this.ns
-		for (let node of this.nodes.values()) {
-			while (!node.isSea()) {
-				node.water += wetness;
-				node = this.getNode(node.drain);
-			}
+		for (let node of nodes) {
+			node.water += wetness;
+			let drain = this.getNode(node.drain);
+			drain.water += node.water;
 		}
 	}
 
@@ -206,12 +201,13 @@ class World {
 			id = "worldlevel";
 		}
 		let canvas = document.getElementById(id);
+		canvas.hidden = false;
 		canvas.width = this.size.x;
 		canvas.height = this.size.y;
 		let display = new Display(canvas)
 		for (let node of this.nodes.values()) {
 			if (node.isSea()) {
-				display.circle(node.pos, this.ns / 2, "#00a");
+				display.circle(node.pos, this.ns *0.65, "#00a");
 			} else {
 				let h = node.height*0.8;
 				let r = clamp(h*2, 0, 1);
@@ -222,11 +218,11 @@ class World {
 		}
 		for (let node of this.nodes.values()) {
 			if (node.isSea()) {
-				for (let neighbour of this.neighbours(node)) {
-					if (neighbour && neighbour.isSea()) {
-						display.line(node.pos, neighbour.pos, "#008", this.ns/2);
-					}
-				}
+				// for (let neighbour of this.neighbours(node)) {
+				// 	if (neighbour && neighbour.isSea()) {
+				// 		display.line(node.pos, neighbour.pos, "#008", this.ns/2);
+				// 	}
+				// }
 			} else {
 				if (node.water < 1) {
 					continue;
@@ -244,17 +240,46 @@ class World {
 
 
 
-function main() {
-	let seed = Math.random() * 1e6 | 0;
-	let size = 940;
-	let world = time("world", () => new World(vec2(size, size), 16, seed));
-	time("heighten", () => world.heighten(1, 0.003, 0.5));
-	time("cut edge", () => world.cutEdge(-0.5, size / 4));
+function generate(settings) {
+	let seed = settings.seed || Math.random() * 1e6 | 0;
+	let size = settings.size || 940;
+	console.log("  start generating", settings);
+	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 16, seed));
+	time("heighten", () => world.heighten(settings.amplitute || 1, settings.frequency || 0.003, settings.baseHeight || 0.5));
+	time("cut edge", () => world.cutEdge(settings.edgeHeight || -0.5, size * 0.005 * (settings.edgePercentage || 50)));
 	time("land", () => world.land());
-	time("drain", () => world.drain(0.005));
-	time("draw", () => world.draw("partial"));
-	time("erode", () => world.erode(16.0, 10));
+	time("drain", () => world.drain(settings.wetness || 0.005));
+	if (settings.drawPartial) {
+		time("draw partial", () => world.draw("partial"));
+	} else {
+		document.getElementById("partial").hidden = true;
+	}
+	time("erode", () => world.erode(settings.erosion || 16.0, settings.shoreErosion || 10));
 	time("draw", () => world.draw());
+	console.log("  generate done")
 	window.world = world;
 }
+
+function readSettings(form) {
+	return {
+		seed: +form.seed.value,
+		size: +form.size.value,
+		nodeSize: +form.nodesize.value,
+		amplitude: +form.amplitude.value,
+		frequency: +form.frequency.value,
+		baseHeight: +form.baseheight.value,
+		edgeHeight: +form.edgeheight.value,
+		edgePercentage: +form.edgepercentage.value,
+		wetness: +form.wetness.value,
+		drawPartial: form.drawpartial.checked,
+		erosion: +form.erosion.value,
+		shoreErosion: +form.shoreerosion.value,
+	};
+}
+
+function main() {
+	generate({})
+	document.getElementById("settings").addEventListener("submit", e => generate(readSettings(e.target)));
+}
+
 window.addEventListener("load", main);
