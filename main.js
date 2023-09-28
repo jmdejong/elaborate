@@ -10,6 +10,7 @@ class Node {
 		this.water = 0;
 		this.height = 0;
 		this.isEdge = false;
+		this.lake = 0;
 	}
 
 	neighbours() {
@@ -150,7 +151,12 @@ class World {
 	}
 
 
-	land() {
+	land(lakeAmount, lakeSize) {
+		let noise = new FastNoiseLite(hash(this.seed^23790));
+		noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+		noise.SetFractalType(FastNoiseLite.FractalType.FBm);
+		noise.SetFractalOctaves(8);
+		noise.SetFrequency(1/lakeSize);
 		let fringe = new PriorityFringe(hash(this.seed ^ 2245));
 		let visited = new Set();
 		for (let node of this.edges()) {
@@ -162,7 +168,13 @@ class World {
 			for (let neighbour of this.neighbours(node)) {
 				if (!visited.has(neighbour.id.hash())) {
 					if (neighbour.height < node.height) {
-						neighbour.height = node.height + randf(neighbour.id, 3627) * 0.001;
+						let l = noise.GetNoise(neighbour.pos.x, neighbour.pos.y) + 1 - lakeAmount;
+						if (l < 0) {
+							neighbour.lake = l*(node.height - neighbour.height);
+							neighbour.height = node.height+1e-6;
+						} else {
+							neighbour.height = node.height + randf(neighbour.id, 3627) * 0.001;
+						}
 					}
 					if (!neighbour.isEdge){
 						neighbour.drain = node.id;
@@ -210,6 +222,8 @@ class World {
 		for (let node of this.nodes.values()) {
 			if (node.isSea()) {
 				display.circle(node.pos, this.ns *0.65, "#00a");
+			} else if (node.lake) {
+				display.circle(node.pos, this.ns *0.65, "#00f");
 			} else {
 				let h = node.height*0.8;
 				let r = clamp(h*2, 0, 1);
@@ -250,7 +264,7 @@ function generate(settings) {
 	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 8, seed));
 	time("heighten", () => world.heighten(settings.amplitude, settings.frequency, settings.baseHeight));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add"));
-	time("land", () => world.land());
+	time("land", () => world.land(settings.lakeAmount, settings.lakeSize));
 	time("drain", () => world.drain(settings.wetness));
 	if (settings.drawPartial) {
 		time("draw partial", () => world.draw("partial"));
@@ -275,6 +289,8 @@ function readSettings(form) {
 		edgeHeight: +(form.edgeheight.value || -0.5),
 		edgeMode: form.edgemode.value,
 		edgePercentage: +(form.edgepercentage.value || 50),
+		lakeAmount: +(form.lakeamount.value || 0.0),
+		lakeSize: +(form.lakesize.value || 50),
 		wetness: +(form.wetness.value || 0.005),
 		drawPartial: form.drawpartial.checked,
 		erosion: +(form.erosion.value || 16),
