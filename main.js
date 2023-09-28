@@ -164,7 +164,7 @@ class World {
 					if (neighbour.height < node.height) {
 						neighbour.height = node.height + randf(neighbour.id, 3627) * 0.001;
 					}
-					if (!neighbour.isSea()) {
+					if (!neighbour.isEdge){
 						neighbour.drain = node.id;
 					}
 					fringe.put(neighbour);
@@ -175,7 +175,7 @@ class World {
 	}
 
 	drain(w) {
-		let nodes = Array.from(this.nodes.values()).filter(node => !node.isSea())
+		let nodes = Array.from(this.nodes.values()).filter(node => !node.isEdge)
 		nodes.sort((a, b) => b.height - a.height);
 		let wetness = w *this.ns*this.ns
 		for (let node of nodes) {
@@ -185,14 +185,14 @@ class World {
 		}
 	}
 
-	erode(amount, shore) {
-		let nodes = Array.from(this.nodes.values()).filter(node => !node.isSea())
+	erode(amount, fjords) {
+		let nodes = Array.from(this.nodes.values()).filter(node => !node.isEdge)
 		nodes.sort((a, b) => a.height - b.height);
 
 		for (let node of nodes) {
 			let drain = this.getNode(node.drain);
 			let dh = (node.height - drain.height);
-			let water = drain.isSea() ? shore : drain.water;
+			let water = drain.isEdge ? 1 : drain.isSea() ? Math.pow(drain.water, fjords) : drain.water;
 			let erosion = Math.sqrt(water) * amount / this.ns;
 			node.height = drain.height + dh / Math.max(erosion, 1);
 		}
@@ -219,12 +219,12 @@ class World {
 			}
 		}
 		for (let node of this.nodes.values()) {
-			if (node.isSea()) {
-				// for (let neighbour of this.neighbours(node)) {
-				// 	if (neighbour && neighbour.isSea()) {
-				// 		display.line(node.pos, neighbour.pos, "#008", this.ns/2);
-				// 	}
-				// }
+			if (node.isSea()) {/*
+				for (let neighbour of this.neighbours(node)) {
+					if (neighbour && neighbour.isSea()) {
+						display.line(node.pos, neighbour.pos, "#008", this.ns/2);
+					}
+				}*/
 			} else {
 				if (node.water < 1.1) {
 					continue;
@@ -257,7 +257,7 @@ function generate(settings) {
 	} else {
 		document.getElementById("partial").hidden = true;
 	}
-	time("erode", () => world.erode(settings.erosion, settings.shoreErosion));
+	time("erode", () => world.erode(settings.erosion, settings.fjords));
 	time("draw", () => world.draw());
 	console.log("  generate done")
 	window.world = world;
@@ -278,7 +278,7 @@ function readSettings(form) {
 		wetness: +(form.wetness.value || 0.005),
 		drawPartial: form.drawpartial.checked,
 		erosion: +(form.erosion.value || 16),
-		shoreErosion: +(form.shoreerosion.value || 10),
+		fjords: +(form.fjords.value || 0.1),
 	};
 }
 
