@@ -28,7 +28,7 @@
 	</label>
 	<label>
 		nodesize
-		<input type="number" name="nodesize" value="16" />
+		<input type="number" name="nodesize" value="8" />
 	</label>
 	<br />
 	<label>
@@ -41,7 +41,7 @@
 	</label>
 	<label>
 		base height
-		<input type="number" name="baseheight" value="0.5" step="0.1"/>
+		<input type="number" name="baseheight" value="0.5" step="0.1" />
 	</label>
 	<br />
 	<label>
@@ -51,6 +51,13 @@
 	<label>
 		edge percentage of size
 		<input type="number" name="edgepercentage" value="50" />
+	</label>
+	<label>
+		mode
+		<select name="edgemode">
+			<option value="mult">Multiplicative</option>
+			<option value="add">Additive</option>
+		</select>
 	</label>
 	<br />
 	<label>
@@ -74,5 +81,9 @@
 	<br />
 	<input type="submit" value="Generate" />
 </form>
+<div>
+	Current settings:
+	<pre id="currentsettings"></pre>
+</div>
 </body>
 </html>

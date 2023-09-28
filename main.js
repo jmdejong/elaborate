@@ -9,6 +9,7 @@ class Node {
 		this.drain = null;
 		this.water = 0;
 		this.height = 0;
+		this.isEdge = false;
 	}
 
 	neighbours() {
@@ -16,7 +17,7 @@ class Node {
 	}
 
 	isSea() {
-		return this.height < 0;
+		return this.height < 0 || this.isEdge;
 	}
 }
 
@@ -90,6 +91,9 @@ class World {
 				this.nodes.set(nv.hash(), node);
 			}
 		}
+		for (let node of this.edges()) {
+			node.isEdge = true;
+		}
 	}
 
 	_leftX(y) {
@@ -137,13 +141,11 @@ class World {
 		}
 	}
 
-	cutEdge(baseHeight, distance) {
+	cutEdge(baseHeight, distance, additive) {
+		console.log("edge", additive ? "add" : "mult");
 		for (let node of this.nodes.values()) {
 			let d = Math.min(node.pos.x, this.size.x - node.pos.x, node.pos.y, this.size.y - node.pos.y, distance)/distance;
-			node.height = baseHeight + (node.height - baseHeight) * d;
-		}
-		for (let node of this.edges()) {
-			node.height = baseHeight;
+			node.height = node.height*(additive ? 1 : d) + baseHeight * (1-d);
 		}
 	}
 
@@ -241,45 +243,49 @@ class World {
 
 
 function generate(settings) {
-	let seed = settings.seed || Math.random() * 1e6 | 0;
-	let size = settings.size || 940;
+	let seed = settings.seed;
+	let size = settings.size;
 	console.log("  start generating", settings);
-	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 16, seed));
-	time("heighten", () => world.heighten(settings.amplitude || 1, settings.frequency || 0.003, settings.baseHeight || 0.5));
-	time("cut edge", () => world.cutEdge(settings.edgeHeight || -0.5, size * 0.005 * (settings.edgePercentage || 50)));
+	document.get
+	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 8, seed));
+	time("heighten", () => world.heighten(settings.amplitude, settings.frequency, settings.baseHeight));
+	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add"));
 	time("land", () => world.land());
-	time("drain", () => world.drain(settings.wetness || 0.005));
+	time("drain", () => world.drain(settings.wetness));
 	if (settings.drawPartial) {
 		time("draw partial", () => world.draw("partial"));
 	} else {
 		document.getElementById("partial").hidden = true;
 	}
-	time("erode", () => world.erode(settings.erosion || 16.0, settings.shoreErosion || 10));
+	time("erode", () => world.erode(settings.erosion, settings.shoreErosion));
 	time("draw", () => world.draw());
 	console.log("  generate done")
 	window.world = world;
+	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
 }
 
 function readSettings(form) {
 	return {
-		seed: +form.seed.value,
-		size: +form.size.value,
-		nodeSize: +form.nodesize.value,
-		amplitude: +form.amplitude.value,
-		frequency: +form.frequency.value,
-		baseHeight: +form.baseheight.value,
-		edgeHeight: +form.edgeheight.value,
-		edgePercentage: +form.edgepercentage.value,
-		wetness: +form.wetness.value,
+		seed: +(form.seed.value || Math.random() * 1e6 | 0),
+		size: +(form.size.value || 1024),
+		nodeSize: +(form.nodesize.value || 16),
+		amplitude: +(form.amplitude.value || 1),
+		frequency: +(form.frequency.value || 0.005),
+		baseHeight: +(form.baseheight.value || 0.5),
+		edgeHeight: +(form.edgeheight.value || -0.5),
+		edgeMode: form.edgemode.value,
+		edgePercentage: +(form.edgepercentage.value || 50),
+		wetness: +(form.wetness.value || 0.005),
 		drawPartial: form.drawpartial.checked,
-		erosion: +form.erosion.value,
-		shoreErosion: +form.shoreerosion.value,
+		erosion: +(form.erosion.value || 16),
+		shoreErosion: +(form.shoreerosion.value || 10),
 	};
 }
 
 function main() {
-	generate({})
-	document.getElementById("settings").addEventListener("submit", e => generate(readSettings(e.target)));
+	let form = document.getElementById("settings");
+	form.addEventListener("submit", e => generate(readSettings(e.target.elements)));
+	generate(readSettings(form.elements));
 }
 
 window.addEventListener("load", main);
