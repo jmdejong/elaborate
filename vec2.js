@@ -8,7 +8,8 @@ class Vec2 {
 	}
 
 	hash() {
-		return this.x + "," + this.y;
+		// return this.x + "," + this.y;
+		return this.x + (1<<15) | (this.y + (1<<15)) <<16;
 	}
 
 	surface() {
@@ -55,10 +56,10 @@ Vec2.fromUint = function Vec2FromUint(uint) {
 	return new Vec2(uint & 0xffff, uint >> 16);
 }
 
-Vec2.unHash = function Vec2UnHash(str) {
-	let [x, y] = str.split(",").map(i => i | 0)
-	return new Vec2(x, y);
-}
+// Vec2.unHash = function Vec2UnHash(str) {
+// 	let [x, y] = str.split(",").map(i => i | 0)
+// 	return new Vec2(x, y);
+// }
 
 Vec2.rand = function Vec2Rand() {
 	return new Vec2(Math.random() * 2 - 1, Math.random() * 2 - 1);

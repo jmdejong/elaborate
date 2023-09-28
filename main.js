@@ -224,7 +224,7 @@ class World {
 				// 	}
 				// }
 			} else {
-				if (node.water < 1) {
+				if (node.water < 1.1) {
 					continue;
 				}
 				let drain = this.getNode(node.drain);
@@ -245,7 +245,7 @@ function generate(settings) {
 	let size = settings.size || 940;
 	console.log("  start generating", settings);
 	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 16, seed));
-	time("heighten", () => world.heighten(settings.amplitute || 1, settings.frequency || 0.003, settings.baseHeight || 0.5));
+	time("heighten", () => world.heighten(settings.amplitude || 1, settings.frequency || 0.003, settings.baseHeight || 0.5));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight || -0.5, size * 0.005 * (settings.edgePercentage || 50)));
 	time("land", () => world.land());
 	time("drain", () => world.drain(settings.wetness || 0.005));
