@@ -142,10 +142,13 @@ class World {
 		}
 	}
 
-	cutEdge(baseHeight, distance, additive) {
-		console.log("edge", additive ? "add" : "mult");
+	cutEdge(baseHeight, distance, additive, parabolic) {
 		for (let node of this.nodes.values()) {
 			let d = Math.min(node.pos.x, this.size.x - node.pos.x, node.pos.y, this.size.y - node.pos.y, distance)/distance;
+			if (parabolic) {
+				let d_ = 1-d;
+				d = 1 -  d_ * d_;
+			}
 			node.height = node.height*(additive ? 1 : d) + baseHeight * (1-d);
 		}
 	}
@@ -263,7 +266,7 @@ function generate(settings) {
 	document.get
 	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 8, seed));
 	time("heighten", () => world.heighten(settings.amplitude, settings.frequency, settings.baseHeight));
-	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add"));
+	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
 	time("land", () => world.land(settings.lakeAmount, settings.lakeSize));
 	time("drain", () => world.drain(settings.wetness));
 	if (settings.drawPartial) {
@@ -278,23 +281,29 @@ function generate(settings) {
 	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
 }
 
+
+
 function readSettings(form) {
+	function n(input) {
+		return +(input.value || input.defaultValue);
+	}
 	return {
 		seed: +(form.seed.value || Math.random() * 1e6 | 0),
-		size: +(form.size.value || 1024),
-		nodeSize: +(form.nodesize.value || 16),
-		amplitude: +(form.amplitude.value || 1),
-		frequency: +(form.frequency.value || 0.005),
-		baseHeight: +(form.baseheight.value || 0.5),
-		edgeHeight: +(form.edgeheight.value || -0.5),
+		size: n(form.size),
+		nodeSize: n(form.nodesize),
+		amplitude: n(form.amplitude),
+		frequency: n(form.frequency),
+		baseHeight: n(form.baseheight),
+		edgeHeight: n(form.edgeheight),
+		edgePercentage: n(form.edgepercentage),
 		edgeMode: form.edgemode.value,
-		edgePercentage: +(form.edgepercentage.value || 50),
-		lakeAmount: +(form.lakeamount.value || 0.0),
-		lakeSize: +(form.lakesize.value || 50),
-		wetness: +(form.wetness.value || 0.005),
+		edgeShape: form.edgeshape.value,
+		lakeAmount: n(form.lakeamount),
+		lakeSize: n(form.lakesize),
+		wetness: n(form.wetness),
 		drawPartial: form.drawpartial.checked,
-		erosion: +(form.erosion.value || 16),
-		fjords: +(form.fjords.value || 0.1),
+		erosion: n(form.erosion),
+		fjords: n(form.fjords),
 	};
 }
 
