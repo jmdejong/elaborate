@@ -14,3 +14,8 @@ canvas {
 input[type=number] {
 	width: 6em;
 }
+
+label {
+	border: 1px solid #ddd;
+	margin: 1px;
+}

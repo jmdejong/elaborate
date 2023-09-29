@@ -28,3 +28,51 @@ function randf(pos, seed) {
 	let r = hash(pos.y*7 ^ hash(pos.x * 11 ^ hash(seed)));
 	return Math.abs((r % M)/M);
 }
+
+
+class PriorityFringe {
+	constructor() {
+		this.items = new PriorityQueue(node => node.height);
+	}
+	put(item) {
+		this.items.add(item);
+	}
+	take() {
+		return this.items.remove()
+	}
+	isEmpty() {
+		return this.items.heap.length === 0;
+	}
+
+	forEach(fn) {
+		this.items.heap.forEach(fn);
+	}
+}
+class RandomFringe {
+	constructor(seed) {
+		this.seed = seed;
+		this.items = [];
+	}
+	put(item) {
+		this.items.push(item);
+	}
+	take() {
+		this.seed = hash(this.seed);
+		let ind = Math.abs(this.seed) % this.items.length;
+		let last = this.items.pop();
+		if (ind === this.items.length) {
+			return last;
+		} else {
+			let item = this.items[ind];
+			this.items[ind] = last;
+			return item;
+		}
+	}
+	isEmpty() {
+		return this.items.length === 0;
+	}
+
+	forEach(fn) {
+		this.items.forEach(fn);
+	}
+}

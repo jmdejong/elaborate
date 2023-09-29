@@ -6,12 +6,9 @@ class Node {
 	constructor(id, pos) {
 		this.id = id;
 		this.pos = pos;
-		this.drain = null;
-		this.water = 0;
 		this.height = 0;
-		this.lake = 0;
-		this.sediment = 0;
 		this.sink = false;
+		this.reset();
 	}
 
 	neighbours() {
@@ -25,52 +22,13 @@ class Node {
 	isSink() {
 		return this.sink;
 	}
-}
 
-class PriorityFringe {
-	constructor() {
-		this.items = new PriorityQueue(node => node.height);
-	}
-	put(item) {
-		this.items.add(item);
-	}
-	take() {
-		return this.items.remove()
-	}
-	isEmpty() {
-		return this.items.heap.length === 0;
-	}
-
-	forEach(fn) {
-		this.items.heap.forEach(fn);
-	}
-}
-class RandomFringe {
-	constructor(seed) {
-		this.seed = seed;
-		this.items = [];
-	}
-	put(item) {
-		this.items.push(item);
-	}
-	take() {
-		this.seed = hash(this.seed);
-		let ind = Math.abs(this.seed) % this.items.length;
-		let last = this.items.pop();
-		if (ind === this.items.length) {
-			return last;
-		} else {
-			let item = this.items[ind];
-			this.items[ind] = last;
-			return item;
-		}
-	}
-	isEmpty() {
-		return this.items.length === 0;
-	}
-
-	forEach(fn) {
-		this.items.forEach(fn);
+	reset() {
+		this.drain = null;
+		this.water = 0;
+		this.lake = 0;
+		this.sediment = 0;
+		this.speed = 0;
 	}
 }
 
@@ -134,12 +92,6 @@ class World {
 			.filter(v => v);
 	}
 
-	// sortedNodes() {
-	// 	let nodes = Array.from(this.nodes.values()).filter(node => !node.isSink())
-	// 	nodes.sort((a, b) => a.height - b.height);
-	// 	return nodes;
-	// }
-
 	heighten(amplitude, frequency, base, edge) {
 		let noise = new FastNoiseLite(this.seed);
 		noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
@@ -153,7 +105,9 @@ class World {
 
 	cutEdge(baseHeight, distance, additive, parabolic) {
 		for (let node of this.nodes.values()) {
-			let d = Math.min(node.pos.x, this.size.x - node.pos.x, node.pos.y, this.size.y - node.pos.y, distance)/distance;
+			let dx = Math.min(node.pos.x, this.size.x - node.pos.x, distance)/distance;
+			let dy = Math.min(node.pos.y, this.size.y - node.pos.y, distance)/distance;
+			let d = dx * dy;
 			if (parabolic) {
 				let d_ = 1-d;
 				d = 1 -  d_ * d_;
@@ -162,6 +116,11 @@ class World {
 		}
 	}
 
+	reset() {
+		for (let node of this.nodes.values()) {
+			node.reset();
+		}
+	}
 
 	land(lakeAmount, lakeSize) {
 		let noise = new FastNoiseLite(hash(this.seed^23790));
@@ -202,8 +161,6 @@ class World {
 	}
 
 	drain(nodes, w) {
-		// let nodes = Array.from(this.nodes.values()).filter(node => !node.isSink())
-		// nodes.sort((a, b) => b.height - a.height);
 		let wetness = w *this.ns*this.ns
 		for (let i=nodes.length; i--;) {
 			let node = nodes[i];
@@ -213,13 +170,12 @@ class World {
 			node.water += wetness;
 			let drain = this.getNode(node.drain);
 			drain.water += node.water;
+			node.speed += node.height - drain.height;
+			drain.speed += 0.9 * node.speed;
 		}
 	}
 
 	erode(nodes, amount, fjords) {
-		// let nodes = Array.from(this.nodes.values()).filter(node => !node.isSink())
-		// nodes.sort((a, b) => a.height - b.height);
-
 		for (let node of nodes) {
 			if (node.isSink()) {
 				continue;
@@ -235,11 +191,31 @@ class World {
 		}
 	}
 
-	depose(amount) {
-
+	depose(nodes, amount, spread) {
+		if (amount <= 0) {
+			return;
+		}
+		for (let i=nodes.length; i--;) {
+			let node = nodes[i];
+			if (node.isSink()) {
+				continue;
+			}
+			let deposited = node.sediment/node.water * amount;
+			node.sediment -= deposited;
+			node.height += deposited;
+			let sediment = node.sediment;
+			let drain = this.getNode(node.drain);
+			drain.sediment += sediment * (1-spread);
+			sediment *= spread;
+			let neighbours = this.neighbours(node);
+			for (let neighbour of this.neighbours(node)) {
+				neighbours.sediment += sediment / neighbours.length;
+			}
+		}
 	}
 
-	draw(id) {
+	draw(id, features, colorscale) {
+		let colors = [[0, 0.5, 0], [0.0, 0.9, 0.0], [0.5, 0.9, 0.1], [0.9, 0.85, 0.2], [0.8, 0.6, 0.0], [0.9, 0.2, 0], [1, 0, 0], [0.75, 0, 0], [0.5, 0, 0], [0.25, 0, 0], [0, 0, 0]];
 		if (!id) {
 			id = "worldlevel";
 		}
@@ -248,38 +224,42 @@ class World {
 		canvas.width = this.size.x;
 		canvas.height = this.size.y;
 		let display = new Display(canvas)
-		for (let node of this.nodes.values()) {
-			if (node.isSea()) {
-				display.circle(node.pos, this.ns *0.65, "#00a");
-			} else if (node.lake) {
-				display.circle(node.pos, this.ns *0.65, "#00f");
-			} else {
-				let h = node.height*0.8;
-				let r = clamp(h*2, 0, 1);
-				let g = clamp(Math.min(h+0.8, 1.8 - h*1.5), 0, 1);
-				let color = `rgb(${r*255}, ${g*255}, 0)`;
-				display.circle(node.pos, this.ns / 2, color);
-			}
-		}
-		for (let node of this.nodes.values()) {
-			if (node.isSea()) {/*
-				for (let neighbour of this.neighbours(node)) {
-					if (neighbour && neighbour.isSea()) {
-						display.line(node.pos, neighbour.pos, "#008", this.ns/2);
-					}
-				}*/
-			} else {
-				if (node.water < 1.1) {
-					continue;
+		if (features.circles) {
+			for (let node of this.nodes.values()) {
+				if (node.isSea()) {
+					display.circle(node.pos, this.ns *0.65, "#00a");
+				} else if (node.lake) {
+					display.circle(node.pos, this.ns *0.65, "#00f");
+				} else {
+					let h = clamp(node.height * colorscale, 0, colors.length -1);
+					let prev = colors[Math.floor(h)];
+					let next = colors[Math.ceil(h)];
+					let dh = h-Math.floor(h);
+					let r = prev[0] * (1-dh) + next[0] * dh;
+					let g = prev[1] * (1-dh) + next[1] * dh;
+					let b = prev[2] * (1-dh) + next[2] * dh;
+					let color = `rgb(${r*255}, ${g*255}, ${b*255})`;
+					display.circle(node.pos, this.ns / 2, color);
 				}
-				let drain = this.getNode(node.drain);
-				display.line(node.pos, drain.pos, "#22f", clamp(Math.sqrt(node.water)/5, 0.5, 5));
 			}
 		}
-	}
-
-	posof(node) {
-		return vec2(16 *node.x + (hash(11 + hash(node.x * 13 + hash(node.y * 17+ 531) + 872)) % 7), 16 * node.y + (hash(23 + hash(node.x * 5 +hash(node.y * 7))) % 7));
+		if (features.rivers) {
+			for (let node of this.nodes.values()) {
+				if (node.isSea()) {/*
+					for (let neighbour of this.neighbours(node)) {
+						if (neighbour && neighbour.isSea()) {
+							display.line(node.pos, neighbour.pos, "#008", this.ns/2);
+						}
+					}*/
+				} else {
+					if (node.water < 1.1) {
+						continue;
+					}
+					let drain = this.getNode(node.drain);
+					display.line(node.pos, drain.pos, "#22f", clamp(Math.sqrt(node.water)/5, 0.5, 5));
+				}
+			}
+		}
 	}
 }
 
@@ -289,20 +269,24 @@ function generate(settings) {
 	let seed = settings.seed;
 	let size = settings.size;
 	console.log("  start generating", settings);
-	document.get
 	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 8, seed));
 	time("heighten", () => world.heighten(settings.amplitude, settings.frequency, settings.baseHeight));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
-	let sorted = time("land", () => world.land(settings.lakeAmount, settings.lakeSize));
-	// let sorted = time("sort", () => world.sortedNodes());
-	time("drain", () => world.drain(sorted, settings.wetness));
-	if (settings.drawPartial) {
-		time("draw partial", () => world.draw("partial"));
-	} else {
-		document.getElementById("partial").hidden = true;
+	for (let i=0; i<settings.iterations; ++i) {
+		world.reset();
+		let sorted = time("land", () => world.land(settings.lakeAmount, settings.lakeSize));
+		time("drain", () => world.drain(sorted, settings.wetness));
+		if (i === 0) {
+			if (settings.drawPartial) {
+				time("draw partial", () => world.draw("partial", settings.drawFeatures, settings.colorscale));
+			} else {
+				document.getElementById("partial").hidden = true;
+			}
+		}
+		time("erode", () => world.erode(sorted, settings.erosion, settings.fjords));
+		time("depose", () => world.depose(sorted, settings.deposition, settings.depositionSpread));
 	}
-	time("erode", () => world.erode(sorted, settings.erosion, settings.fjords));
-	time("draw", () => world.draw());
+	time("draw", () => world.draw(null, settings.drawFeatures, settings.colorscale));
 	console.log("  generate done")
 	window.world = world;
 	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
@@ -331,6 +315,14 @@ function readSettings(form) {
 		drawPartial: form.drawpartial.checked,
 		erosion: n(form.erosion),
 		fjords: n(form.fjords),
+		deposition: n(form.deposition),
+		depositionSpread: n(form.depositionspread),
+		iterations: n(form.iterations),
+		drawFeatures: {
+			rivers: form.drawrivers.checked,
+			circles: form.drawcircles.checked
+		},
+		colorscale: n(form.colorscale)
 	};
 }
 
