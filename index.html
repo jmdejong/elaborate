@@ -109,22 +109,26 @@
 	<br />
 
 	<label>
-		iterations
-		<input type="number" name="iterations" value="1" min="1" />
+		erosion iterations
+		<input type="number" name="iterations" value="1" min="0" />
 	</label>
 	<label>
 		erosion factor over iterations
 		<input type="number" name="erosionStep" value="0.5" step="0.01" min="0"/>
 	</label>
+	<label>
+		skip final depose step
+		<input type="checkbox" name="skipFinalDepose" />
+	</label>
 	<br />
 
 	<label>
 		draw rivers
-		<input type="checkbox" name="draw.rivers" checked />
+		<input type="checkbox" name="drawRivers" checked />
 	</label>
 	<label>
 		draw circles
-		<input type="checkbox" name="draw.circles" checked />
+		<input type="checkbox" name="drawCircles" checked />
 	</label>
 	<label>
 		height of max color
@@ -133,6 +137,10 @@
 	<label>
 		draw pre-erosion result
 		<input type="checkbox" name="drawPartial" />
+	</label>
+	<label>
+		draw lakes deeper than
+		<input type="number" name="minLakeDepth" value="0.01" step="0.001" min="0"/>
 	</label>
 	<br />
 

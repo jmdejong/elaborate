@@ -19,6 +19,10 @@ class Node {
 		return this.baseHeight < 0 || this.isSink();
 	}
 
+	isWaterBody() {
+		return this.isSea() || this.waterHeight > 0;
+	}
+
 	isSink() {
 		return this.sink;
 	}
@@ -108,6 +112,15 @@ class NodeGraph {
 		}
 	}
 
+	drains(node) {
+		let drain = this.drain(node);
+		if (drain) {
+			return [this.drain(node)];
+		} else {
+			return null;
+		}
+	}
+
 	all() {
 		return this.nodes.values();
 	}
@@ -118,9 +131,9 @@ class NodeGraph {
 		}
 	}
 
-	draw(id, features, colorMax) {
+	draw(id, settings) {
 		let colors = [[0, 0.5, 0], [0.0, 0.9, 0.0], [0.5, 0.9, 0.1], [0.9, 0.85, 0.2], [0.8, 0.6, 0.0], [0.9, 0.2, 0], [1, 0, 0], [0.75, 0, 0], [0.5, 0, 0], [0.25, 0, 0], [0, 0, 0]];
-		let colorscale = colors.length / colorMax;
+		let colorscale = colors.length / settings.colorMax;
 		function color(height) {
 			let h = clamp(height * colorscale, 0, colors.length -1);
 			let prev = colors[Math.floor(h)];
@@ -136,9 +149,9 @@ class NodeGraph {
 		canvas.width = this.size.x;
 		canvas.height = this.size.y;
 		let display = new Display(canvas)
-		if (features.circles) {
+		if (settings.drawCircles) {
 			for (let node of this.nodes.values()) {
-				if (node.isSea() || node.waterHeight > 0.001) {
+				if (node.isSea() || node.waterHeight > settings.minLakeDepth) {
 					display.circle(node.pos, this.ns *0.65, "#00a");
 				} else if (node.lake) {
 					display.circle(node.pos, this.ns *0.65, "#00f");
@@ -149,7 +162,7 @@ class NodeGraph {
 				}
 			}
 		}
-		if (features.rivers) {
+		if (settings.drawRivers) {
 			for (let node of this.nodes.values()) {
 				if (node.isSea()) {/*
 					for (let neighbour of this.neighbours(node)) {
@@ -231,9 +244,7 @@ class World {
 							neighbour.baseHeight = node.height() + randf(neighbour.id, this.graph.seed ^ 3627) * plainsSlope / (node.height() - neighbour.height() + 1);
 						}
 					}
-					if (!neighbour.isSink()) {
-						neighbour.drain = node.id;
-					}
+					neighbour.drain = node.id;
 					fringe.put(neighbour);
 					visited.add(neighbour.id.hash());
 				}
@@ -250,14 +261,20 @@ class World {
 				continue;
 			}
 			node.water += wetness;
-			let drain = this.graph.drain(node);
-			drain.water += node.water;
+			let drains = this.graph.drains(node);
+			for (let drain of drains) {
+				drain.water += node.water / drains.length;
+			}
 		}
 	}
 
 	erode(nodes, amount, fjords) {
 		for (let node of nodes) {
 			if (node.isSink()) {
+				continue;
+			}
+			if (node.isWaterBody()) {
+				//todo
 				continue;
 			}
 			let drain = this.graph.drain(node)
@@ -271,7 +288,7 @@ class World {
 			let eroded = node.height() - newHeight;
 			node.changeGround(-eroded);
 			this.sediment.created += eroded;
-			drain.sediment += eroded;
+			node.sediment += eroded;
 		}
 	}
 
@@ -291,8 +308,10 @@ class World {
 			this.sediment.deposited += deposited;
 
 			let sediment = node.sediment;
-			let drain = this.graph.drain(node);
-			drain.sediment += sediment;
+			let drains = this.graph.drains(node);
+			for (let drain of drains) {
+				drain.sediment += sediment / drains.length;
+			}
 		}
 	}
 }
@@ -307,25 +326,25 @@ function generate(settings) {
 	let world = new World(graph);
 	time("heighten", () => world.heighten(settings.amplitude, settings.featureSize, settings.baseHeight));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
-	let erosionStep = settings.erosionStep;
-	let erosionScale = (Math.pow(erosionStep, settings.iterations)-1)/(erosionStep-1);
-	for (let i=0; i<settings.iterations; ++i) {
-		graph.reset();
-		let sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize));
-		time("drain", () => world.drain(sorted, settings.rainfall));
-		if (i === 0) {
-			if (settings.drawPartial) {
-				time("draw partial", () => graph.draw("partial", settings.draw, settings.colorMax));
-			} else {
-				document.getElementById("partial").hidden = true;
-			}
-		}
-		let erosion = settings.erosion * Math.pow(erosionStep, i) / erosionScale;
-		time("erode", () => world.erode(sorted, erosion, settings.fjords));
-		time("depose", () => world.depose(sorted, settings.deposition, settings.depositionSpread));
-
+	let sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize));
+	time("drain", () => world.drain(sorted, settings.rainfall));
+	if (settings.drawPartial) {
+		time("draw partial", () => graph.draw("partial", settings));
+	} else {
+		document.getElementById("partial").hidden = true;
 	}
-	time("draw", () => graph.draw(null, settings.draw, settings.colorMax));
+	let erosionScale = scaleExp(settings.iterations, settings.erosionStep);
+	for (let i=0; i<settings.iterations; ++i) {
+		let erosion = settings.erosion * Math.pow(settings.erosionStep, i) * erosionScale;
+		time("erode", () => world.erode(sorted, erosion, settings.fjords));
+		if (!(settings.skipFinalDepose &&i === settings.iterations - 1)) {
+			time("depose", () => world.depose(sorted, settings.deposition, settings.depositionSpread));
+		}
+		graph.reset();
+		sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize));
+		time("drain", () => world.drain(sorted, settings.rainfall));
+	}
+	time("draw", () => graph.draw(null, settings));
 	console.log(`sediment created: ${world.sediment.created / 1e6}, sediment deposited: ${world.sediment.deposited/1e6}, sediment lost: ${world.sediment.lost/1e6}, balance: ${(world.sediment.created - world.sediment.deposited - world.sediment.lost)/1e6}`);
 	let endTime = Date.now();
 	console.log("  generate done", (endTime - startTime) / 1000);
@@ -348,17 +367,7 @@ function readSettings(form) {
 	let settings = {};
 	for (let input of form) {
 		if (input.name) {
-			let parts = input.name.split(".");
-			let obj = settings;
-			while (parts.length > 1) {
-				let head = parts.shift();
-				if (obj[head] === undefined) {
-					obj[head] = {};
-				}
-				obj = obj[head];
-			}
-			let name = parts[0];
-			obj[name] = n(input);
+			settings[input.name] = n(input);
 		}
 	}
 	if (!settings.seed) {

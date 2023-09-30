@@ -29,6 +29,17 @@ function randf(pos, seed) {
 	return Math.abs((r % M)/M);
 }
 
+function scaleExp(n, growth) {
+	if (n === 0 || growth === 0) {
+		return 1;
+	}
+	let total = 0;
+	for (let i=0; i<n; ++i) {
+		total += Math.pow(growth, i);
+	}
+	return 1/total;
+}
+
 
 class PriorityFringe {
 	constructor(keyfn) {
