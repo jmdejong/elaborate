@@ -6,7 +6,7 @@ class Node {
 	constructor(id, pos) {
 		this.id = id;
 		this.pos = pos;
-		this.height = 0;
+		this.baseHeight = 0;
 		this.sink = false;
 		this.reset();
 	}
@@ -16,16 +16,24 @@ class Node {
 	}
 
 	isSea() {
-		return this.height < 0 || this.isSink();
+		return this.baseHeight < 0 || this.isSink();
 	}
 
 	isSink() {
 		return this.sink;
 	}
 
+	height() {
+		return this.baseHeight + this.waterHeight;
+	}
+
+	changeGround(ground) {
+		this.baseHeight += ground;
+	}
+
 	reset() {
 		this.water = 0;
-		this.lake = 0;
+		this.waterHeight = 0;
 		this.sediment = 0;
 		this.drain = null;
 	}
@@ -130,12 +138,12 @@ class NodeGraph {
 		let display = new Display(canvas)
 		if (features.circles) {
 			for (let node of this.nodes.values()) {
-				if (node.isSea()) {
+				if (node.isSea() || node.waterHeight > 0.001) {
 					display.circle(node.pos, this.ns *0.65, "#00a");
 				} else if (node.lake) {
 					display.circle(node.pos, this.ns *0.65, "#00f");
 				} else {
-					let [r, g, b] = color(node.height).map(c => c*255);
+					let [r, g, b] = color(node.height()).map(c => c*255);
 					let col = `rgb(${r}, ${g}, ${b})`;
 					display.circle(node.pos, this.ns / 2, col);
 				}
@@ -175,7 +183,7 @@ class World {
 		noise.SetFractalOctaves(8);
 		noise.SetFrequency(1/featureSize);
 		for (let node of this.graph.all()) {
-			node.height += noise.GetNoise(node.pos.x, node.pos.y) * amplitude + base;
+			node.changeGround(noise.GetNoise(node.pos.x, node.pos.y) * amplitude + base);
 		}
 	}
 
@@ -191,7 +199,7 @@ class World {
 				let d_ = 1-d;
 				d = 1 -  d_ * d_;
 			}
-			node.height = node.height*(additive ? 1 : d) + baseHeight * (1-d);
+			node.baseHeight = node.baseHeight*(additive ? 1 : d) + baseHeight * (1-d);
 		}
 	}
 
@@ -201,7 +209,7 @@ class World {
 		noise.SetFractalType(FastNoiseLite.FractalType.FBm);
 		noise.SetFractalOctaves(8);
 		noise.SetFrequency(1/lakeSize);
-		let fringe = new PriorityFringe(hash(this.graph.seed ^ 2245));
+		let fringe = new PriorityFringe(node => node.height());
 		let visited = new Set();
 		let sorted = [];
 		for (let node of this.graph.sinks()) {
@@ -213,13 +221,14 @@ class World {
 			sorted.push(node);
 			for (let neighbour of this.graph.neighbours(node)) {
 				if (!visited.has(neighbour.id.hash())) {
-					if (neighbour.height < node.height) {
-						let l = noise.GetNoise(neighbour.pos.x, neighbour.pos.y) + 1 - lakeAmount;
-						if (l < 0) {
-							neighbour.lake = l*(node.height - neighbour.height);
-							neighbour.height = node.height+1e-6;
+					if (neighbour.height() < node.height()) {
+						let l = clamp(noise.GetNoise(neighbour.pos.x, neighbour.pos.y) + lakeAmount * 2 - 1, -1, 1);
+						if (l > 0) {
+							neighbour.waterHeight = l * (node.height() - neighbour.height());
+							let totalHeight = node.height() + 1e-6 * randf(neighbour.id, this.graph.seed ^ 8429);
+							neighbour.baseHeight = totalHeight - neighbour.waterHeight;
 						} else {
-							neighbour.height = node.height + randf(neighbour.id, 3627) * plainsSlope / (node.height - neighbour.height + 1);
+							neighbour.baseHeight = node.height() + randf(neighbour.id, this.graph.seed ^ 3627) * plainsSlope / (node.height() - neighbour.height() + 1);
 						}
 					}
 					if (!neighbour.isSink()) {
@@ -252,12 +261,15 @@ class World {
 				continue;
 			}
 			let drain = this.graph.drain(node)
-			let dh = (node.height - drain.height);
+			let dh = (node.baseHeight - drain.height());
+			if (dh <= 0) {
+				continue;
+			}
 			let water = drain.isSink() ? 1 : drain.isSea() ? Math.pow(drain.water, fjords) : drain.water;
 			let erosion = Math.sqrt(water) * amount / this.graph.ns;
-			let newHeight = Math.min(drain.height + dh / Math.max(1,erosion), node.height);
-			let eroded = node.height - newHeight;
-			node.height -= eroded;
+			let newHeight = Math.min(drain.height() + dh / Math.max(1,erosion), node.height());
+			let eroded = node.height() - newHeight;
+			node.changeGround(-eroded);
 			this.sediment.created += eroded;
 			drain.sediment += eroded;
 		}
@@ -275,7 +287,7 @@ class World {
 			}
 			let deposited = node.sediment * amount / node.water;
 			node.sediment -= deposited;
-			node.height += deposited;
+			node.changeGround(deposited);
 			this.sediment.deposited += deposited;
 
 			let sediment = node.sediment;

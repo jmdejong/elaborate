@@ -31,8 +31,8 @@ function randf(pos, seed) {
 
 
 class PriorityFringe {
-	constructor() {
-		this.items = new PriorityQueue(node => node.height);
+	constructor(keyfn) {
+		this.items = new PriorityQueue(keyfn);
 	}
 	put(item) {
 		this.items.add(item);
