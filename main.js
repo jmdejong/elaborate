@@ -92,12 +92,12 @@ class World {
 			.filter(v => v);
 	}
 
-	heighten(amplitude, frequency, base, edge) {
+	heighten(amplitude, featureSize, base, edge) {
 		let noise = new FastNoiseLite(this.seed);
 		noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
 		noise.SetFractalType(FastNoiseLite.FractalType.FBm);
 		noise.SetFractalOctaves(8);
-		noise.SetFrequency(frequency);
+		noise.SetFrequency(1/featureSize);
 		for (let node of this.nodes.values()) {
 			node.height += noise.GetNoise(node.pos.x, node.pos.y) * amplitude + base;
 		}
@@ -270,7 +270,7 @@ function generate(settings) {
 	let size = settings.size;
 	console.log("  start generating", settings);
 	let world = time("world", () => new World(vec2(size, size), settings.nodeSize || 8, seed));
-	time("heighten", () => world.heighten(settings.amplitude, settings.frequency, settings.baseHeight));
+	time("heighten", () => world.heighten(settings.amplitude, settings.featureSize, settings.baseHeight));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
 	for (let i=0; i<settings.iterations; ++i) {
 		world.reset();
@@ -278,7 +278,7 @@ function generate(settings) {
 		time("drain", () => world.drain(sorted, settings.wetness));
 		if (i === 0) {
 			if (settings.drawPartial) {
-				time("draw partial", () => world.draw("partial", settings.drawFeatures, settings.colorscale));
+				time("draw partial", () => world.draw("partial", settings.draw, settings.colorscale));
 			} else {
 				document.getElementById("partial").hidden = true;
 			}
@@ -286,44 +286,44 @@ function generate(settings) {
 		time("erode", () => world.erode(sorted, settings.erosion, settings.fjords));
 		time("depose", () => world.depose(sorted, settings.deposition, settings.depositionSpread));
 	}
-	time("draw", () => world.draw(null, settings.drawFeatures, settings.colorscale));
+	time("draw", () => world.draw(null, settings.draw, settings.colorscale));
 	console.log("  generate done")
 	window.world = world;
 	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
 }
 
-
-
 function readSettings(form) {
 	function n(input) {
-		return +(input.value || input.defaultValue);
+		if (input.type === "number") {
+			return +(input.value || input.defaultValue);
+		} else if (input.type === "checkbox") {
+			return input.checked;
+		} else if (input.type === "select-one") {
+			return input.value;
+		} else {
+			console.error(`unknown input type '${input.type}'`, input);
+		}
 	}
-	return {
-		seed: +(form.seed.value || Math.random() * 1e6 | 0),
-		size: n(form.size),
-		nodeSize: n(form.nodesize),
-		amplitude: n(form.amplitude),
-		frequency: n(form.frequency),
-		baseHeight: n(form.baseheight),
-		edgeHeight: n(form.edgeheight),
-		edgePercentage: n(form.edgepercentage),
-		edgeMode: form.edgemode.value,
-		edgeShape: form.edgeshape.value,
-		lakeAmount: n(form.lakeamount),
-		lakeSize: n(form.lakesize),
-		wetness: n(form.wetness),
-		drawPartial: form.drawpartial.checked,
-		erosion: n(form.erosion),
-		fjords: n(form.fjords),
-		deposition: n(form.deposition),
-		depositionSpread: n(form.depositionspread),
-		iterations: n(form.iterations),
-		drawFeatures: {
-			rivers: form.drawrivers.checked,
-			circles: form.drawcircles.checked
-		},
-		colorscale: n(form.colorscale)
-	};
+	let settings = {};
+	for (let input of form) {
+		if (input.name) {
+			let parts = input.name.split(".");
+			let obj = settings;
+			while (parts.length > 1) {
+				let head = parts.shift();
+				if (obj[head] === undefined) {
+					obj[head] = {};
+				}
+				obj = obj[head];
+			}
+			let name = parts[0];
+			obj[name] = n(input);
+		}
+	}
+	if (!settings.seed) {
+		settings.seed = Math.random() * 1e7 | 0;
+	}
+	return settings;
 }
 
 function main() {

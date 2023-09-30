@@ -28,42 +28,42 @@
 	</label>
 	<label>
 		nodesize
-		<input type="number" name="nodesize" value="8" />
+		<input type="number" name="nodeSize" value="8" />
 	</label>
 	<br />
 
+	<label>
+		feature size
+		<input type="number" name="featureSize" value="300" min="1" />
+	</label>
 	<label>
 		amplitude
 		<input type="number" name="amplitude" value="1" step="0.1"/>
 	</label>
 	<label>
-		frequency
-		<input type="number" name="frequency" value="0.003" step="0.0001" />
-	</label>
-	<label>
 		base height
-		<input type="number" name="baseheight" value="0.5" step="0.1" />
+		<input type="number" name="baseHeight" value="0.5" step="0.1" />
 	</label>
 	<br />
 
 	<label>
 		edge height
-		<input type="number" name="edgeheight" value="-0.5" step="0.1" />
+		<input type="number" name="edgeHeight" value="-0.5" step="0.1" />
 	</label>
 	<label>
 		edge percentage of size
-		<input type="number" name="edgepercentage" value="50" />
+		<input type="number" name="edgePercentage" value="50" />
 	</label>
 	<label>
 		mode
-		<select name="edgemode">
+		<select name="edgeMode">
 			<option value="mult">Multiplicative</option>
 			<option value="add">Additive</option>
 		</select>
 	</label>
 	<label>
 		shape
-		<select name="edgeshape">
+		<select name="edgeShape">
 			<option value="parabole">Parabolic</option>
 			<option value="linear">Linear</option>
 		</select>
@@ -72,11 +72,11 @@
 
 	<label>
 		lake amount
-		<input type="number" name="lakeamount" value="0.0" step="0.01" />
+		<input type="number" name="lakeAmount" value="0.0" step="0.01" />
 	</label>
 	<label>
 		lake size
-		<input type="number" name="lakesize" value="50" min="1" />
+		<input type="number" name="lakeSize" value="50" min="1" />
 	</label>
 	<br />
 
@@ -88,7 +88,7 @@
 
 	<label>
 		erosion
-		<input type="number" name="erosion" value="16" step="0.1"/>
+		<input type="number" name="erosion" value="16" />
 	</label>
 	<label>
 		fjords
@@ -100,7 +100,7 @@
 	</label>
 	<label>
 		deposition spread
-		<input type="number" name="depositionspread" value="0.5" step="0.01" min="0" max="1"/>
+		<input type="number" name="depositionSpread" value="0.5" step="0.01" min="0" max="1"/>
 	</label>
 	<br />
 
@@ -112,11 +112,11 @@
 
 	<label>
 		draw rivers
-		<input type="checkbox" name="drawrivers" checked />
+		<input type="checkbox" name="draw.rivers" checked />
 	</label>
 	<label>
 		draw circles
-		<input type="checkbox" name="drawcircles" checked />
+		<input type="checkbox" name="draw.circles" checked />
 	</label>
 	<label>
 		color scale
@@ -124,7 +124,7 @@
 	</label>
 	<label>
 		draw pre-erosion result
-		<input type="checkbox" name="drawpartial" />
+		<input type="checkbox" name="drawPartial" />
 	</label>
 	<br />
 
