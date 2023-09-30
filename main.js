@@ -111,8 +111,9 @@ class NodeGraph {
 		}
 	}
 
-	draw(id, features, colorscale) {
+	draw(id, features, colorMax) {
 		let colors = [[0, 0.5, 0], [0.0, 0.9, 0.0], [0.5, 0.9, 0.1], [0.9, 0.85, 0.2], [0.8, 0.6, 0.0], [0.9, 0.2, 0], [1, 0, 0], [0.75, 0, 0], [0.5, 0, 0], [0.25, 0, 0], [0, 0, 0]];
+		let colorscale = colors.length / colorMax;
 		function color(height) {
 			let h = clamp(height * colorscale, 0, colors.length -1);
 			let prev = colors[Math.floor(h)];
@@ -191,7 +192,7 @@ class World {
 		}
 	}
 
-	land(lakeAmount, lakeSize) {
+	land(plainsSlope, lakeAmount, lakeSize) {
 		let noise = new FastNoiseLite(hash(this.graph.seed^23790));
 		noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
 		noise.SetFractalType(FastNoiseLite.FractalType.FBm);
@@ -215,7 +216,7 @@ class World {
 							neighbour.lake = l*(node.height - neighbour.height);
 							neighbour.height = node.height+1e-6;
 						} else {
-							neighbour.height = node.height + randf(neighbour.id, 3627) * 0.001;
+							neighbour.height = node.height + randf(neighbour.id, 3627) * plainsSlope / (node.height - neighbour.height + 1);
 						}
 					}
 					if (!neighbour.isSink()){
@@ -293,23 +294,25 @@ function generate(settings) {
 	let world = new World(graph);
 	time("heighten", () => world.heighten(settings.amplitude, settings.featureSize, settings.baseHeight));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
-	let erosion = settings.erosion;
+	// let erosion = settings.erosion/(2-Math.pow(2, settings.iterations));
+	let erosionStep = 0.5
+	let erosionScale = (Math.pow(erosionStep, settings.iterations)-1)/(erosionStep-1);
 	for (let i=0; i<settings.iterations; ++i) {
 		graph.reset();
-		let sorted = time("land", () => world.land(settings.lakeAmount, settings.lakeSize));
+		let sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize));
 		time("drain", () => world.drain(sorted, settings.rainfall));
 		if (i === 0) {
 			if (settings.drawPartial) {
-				time("draw partial", () => graph.draw("partial", settings.draw, settings.colorscale));
+				time("draw partial", () => graph.draw("partial", settings.draw, settings.colorMax));
 			} else {
 				document.getElementById("partial").hidden = true;
 			}
 		}
+		let erosion = settings.erosion * Math.pow(erosionStep, i) / erosionScale;
 		time("erode", () => world.erode(sorted, erosion, settings.fjords));
-		erosion /= 2;
 		time("depose", () => world.depose(sorted, settings.deposition, settings.depositionSpread));
 	}
-	time("draw", () => graph.draw(null, settings.draw, settings.colorscale));
+	time("draw", () => graph.draw(null, settings.draw, settings.colorMax));
 	console.log("  generate done")
 	window.world = world;
 	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
