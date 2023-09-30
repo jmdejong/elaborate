@@ -24,11 +24,10 @@ class Node {
 	}
 
 	reset() {
-		this.drain = null;
 		this.water = 0;
 		this.lake = 0;
 		this.sediment = 0;
-		this.speed = 0;
+		this.drain = null;
 	}
 }
 
@@ -154,7 +153,7 @@ class NodeGraph {
 					if (node.water < 1.1) {
 						continue;
 					}
-					let drain = this.getNode(node.drain);
+					let drain = this.drain(node);
 					display.line(node.pos, drain.pos, "#22f", clamp(Math.sqrt(node.water)/5, 0.5, 5));
 				}
 			}
@@ -166,6 +165,7 @@ class World {
 
 	constructor(graph) {
 		this.graph = graph;
+		this.sediment = {created: 0, deposited: 0, lost: 0};
 	}
 
 	heighten(amplitude, featureSize, base, edge) {
@@ -180,6 +180,9 @@ class World {
 	}
 
 	cutEdge(baseHeight, distance, additive, parabolic) {
+		if (distance <= 0) {
+			return;
+		}
 		for (let node of this.graph.all()) {
 			let dx = Math.min(node.pos.x, this.graph.size.x - node.pos.x, distance)/distance;
 			let dy = Math.min(node.pos.y, this.graph.size.y - node.pos.y, distance)/distance;
@@ -219,7 +222,7 @@ class World {
 							neighbour.height = node.height + randf(neighbour.id, 3627) * plainsSlope / (node.height - neighbour.height + 1);
 						}
 					}
-					if (!neighbour.isSink()){
+					if (!neighbour.isSink()) {
 						neighbour.drain = node.id;
 					}
 					fringe.put(neighbour);
@@ -232,7 +235,6 @@ class World {
 
 	drain(nodes, rainfall) {
 		let wetness = rainfall *this.graph.ns*this.graph.ns;
-		console.log("w", wetness);
 		for (let i=nodes.length; i--;) {
 			let node = nodes[i];
 			if (node.isSink()) {
@@ -241,8 +243,6 @@ class World {
 			node.water += wetness;
 			let drain = this.graph.drain(node);
 			drain.water += node.water;
-			node.speed += node.height - drain.height;
-			drain.speed += 0.9 * node.speed;
 		}
 	}
 
@@ -251,13 +251,14 @@ class World {
 			if (node.isSink()) {
 				continue;
 			}
-			let drain = this.graph.drain(node);
+			let drain = this.graph.drain(node)
 			let dh = (node.height - drain.height);
 			let water = drain.isSink() ? 1 : drain.isSea() ? Math.pow(drain.water, fjords) : drain.water;
 			let erosion = Math.sqrt(water) * amount / this.graph.ns;
-			let newHeight = drain.height + dh / Math.max(erosion, 1);
+			let newHeight = Math.min(drain.height + dh / Math.max(1,erosion), node.height);
 			let eroded = node.height - newHeight;
-			node.height = newHeight;
+			node.height -= eroded;
+			this.sediment.created += eroded;
 			drain.sediment += eroded;
 		}
 	}
@@ -269,18 +270,17 @@ class World {
 		for (let i=nodes.length; i--;) {
 			let node = nodes[i];
 			if (node.isSink()) {
+				this.sediment.lost += node.sediment;
 				continue;
 			}
-			let deposited = node.sediment/node.water * amount;
+			let deposited = node.sediment * amount / node.water;
 			node.sediment -= deposited;
 			node.height += deposited;
+			this.sediment.deposited += deposited;
+
 			let sediment = node.sediment;
 			let drain = this.graph.drain(node);
-			drain.sediment += sediment * (1-spread);
-			sediment *= spread;
-			for (let neighbour of this.graph.neighbours(node)) {
-				neighbours.sediment += sediment / neighbours.length;
-			}
+			drain.sediment += sediment;
 		}
 	}
 }
@@ -288,14 +288,14 @@ class World {
 
 
 function generate(settings) {
-	let size = settings.size;
 	console.log("  start generating", settings);
+	let startTime = Date.now();
+	let size = settings.size;
 	let graph = time("initialize graph", () => new NodeGraph(settings.seed, vec2(size, size), settings.nodeSize || 8, settings.nodeRandomness));
 	let world = new World(graph);
 	time("heighten", () => world.heighten(settings.amplitude, settings.featureSize, settings.baseHeight));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
-	// let erosion = settings.erosion/(2-Math.pow(2, settings.iterations));
-	let erosionStep = 0.5
+	let erosionStep = settings.erosionStep;
 	let erosionScale = (Math.pow(erosionStep, settings.iterations)-1)/(erosionStep-1);
 	for (let i=0; i<settings.iterations; ++i) {
 		graph.reset();
@@ -311,9 +311,12 @@ function generate(settings) {
 		let erosion = settings.erosion * Math.pow(erosionStep, i) / erosionScale;
 		time("erode", () => world.erode(sorted, erosion, settings.fjords));
 		time("depose", () => world.depose(sorted, settings.deposition, settings.depositionSpread));
+
 	}
 	time("draw", () => graph.draw(null, settings.draw, settings.colorMax));
-	console.log("  generate done")
+	console.log(`sediment created: ${world.sediment.created / 1e6}, sediment deposited: ${world.sediment.deposited/1e6}, sediment lost: ${world.sediment.lost/1e6}, balance: ${(world.sediment.created - world.sediment.deposited - world.sediment.lost)/1e6}`);
+	let endTime = Date.now();
+	console.log("  generate done", (endTime - startTime) / 1000);
 	window.world = world;
 	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
 }
