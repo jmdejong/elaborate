@@ -32,6 +32,10 @@ class Vec2 {
 		return vec2(this.x + v.x, this.y + v.y);
 	}
 
+	sub(v) {
+		return vec2(this.x - v.x, this.y - v.y);
+	}
+
 	toUint() {
 		return this.x | (this.y << 16);
 	}
@@ -39,6 +43,8 @@ class Vec2 {
 	clone() {
 		return vec2(this.x, this.y);
 	}
+
+
 
 	diamond() {
 		if (Math.abs(this.x) + Math.abs(this.y) > 1) {

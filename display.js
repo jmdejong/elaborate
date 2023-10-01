@@ -32,4 +32,20 @@ class Display {
 		this.ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
 		this.ctx.fill();
 	}
+
+	eachPixel(fn) {
+		let imgData = this.ctx.createImageData(this.canvas.width, this.canvas.height);
+		let data = imgData.data;
+		for (let x=0; x<this.canvas.width; ++x) {
+			for (let y=0; y<this.canvas.height; ++y) {
+				let [r, g, b] = fn(vec2(x, y));
+				let i = (x + y * this.canvas.width) * 4;
+				data[i] = r*255|0;
+				data[i+1] = g*255|0;
+				data[i+2] = b*255|0;
+				data[i+3] = 255;
+			}
+		}
+		this.ctx.putImageData(imgData, 0, 0);
+	}
 }

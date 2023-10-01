@@ -24,11 +24,11 @@
 	</label>
 	<label>
 		size
-		<input type="number" name="size" value="1024" />
+		<input type="number" name="size" value="1024" min="1"/>
 	</label>
 	<label>
 		node size
-		<input type="number" name="nodeSize" value="8" />
+		<input type="number" name="nodeSize" value="8" min="1"/>
 	</label>
 	<label>
 		node randomness
@@ -86,6 +86,10 @@
 		lake size
 		<input type="number" name="lakeSize" value="50" min="1" />
 	</label>
+	<label>
+		lake depth
+		<input type="number" name="lakeDepth" value="0.1" min="0" step="0.01" />
+	</label>
 	<br />
 
 	<label>
@@ -99,16 +103,20 @@
 		<input type="number" name="erosion" value="16" />
 	</label>
 	<label>
-		subaquatic erosion
-		<input type="number" name="fjords" value="1" />
+		sea erosion
+		<input type="number" name="seaErosion" value="1" step="0.01" />
+	</label>
+	<label>
+		lake erosion
+		<input type="number" name="lakeErosion" value="1" step="0.01" />
 	</label>
 	<label>
 		stream deposition
 		<input type="number" name="deposition" value="0" step="0.001" min="0" max="1"/>
 	</label>
 	<label>
-		lake/sea deposition
-		<input type="number" name="lakeDeposition" value="0" step="0.001" min="0" max="1"/>
+		lake/sea deposition factor
+		<input type="number" name="lakeDeposition" value="0" step="0.1" min="0"/>
 	</label>
 	<br />
 
@@ -131,8 +139,16 @@
 		<input type="checkbox" name="drawRivers" checked />
 	</label>
 	<label>
+		draw underwater streams
+		<input type="checkbox" name="drawUnderwaterStreams" />
+	</label>
+	<label>
 		draw circles
 		<input type="checkbox" name="drawCircles" checked />
+	</label>
+	<label>
+		draw area
+		<input type="checkbox" name="drawArea" checked />
 	</label>
 	<label>
 		height of max color
@@ -141,10 +157,6 @@
 	<label>
 		draw pre-erosion result
 		<input type="checkbox" name="drawPartial" />
-	</label>
-	<label>
-		draw lakes deeper than
-		<input type="number" name="minLakeDepth" value="0.01" step="0.001" min="0"/>
 	</label>
 	<br />
 
