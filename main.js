@@ -228,14 +228,14 @@ class World {
 		this.sediment = {created: 0, deposited: 0, lost: 0};
 	}
 
-	heighten(amplitude, featureSize, base, edge) {
-		let noise = new FastNoiseLite(this.graph.seed);
-		noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-		noise.SetFractalType(FastNoiseLite.FractalType.FBm);
-		noise.SetFractalOctaves(8);
-		noise.SetFrequency(1/featureSize);
+	heighten(amplitude, featureSize, base, warpSize, warpEffect) {
+		let noise = new Simplex(this.graph.seed, 8, 1/featureSize);
+		let xwarp = new Simplex(this.graph.seed ^ 123, 4, 1/warpSize);
+		console.log(xwarp);
+		let ywarp = new Simplex(this.graph.seed ^ 321, 4, 1/warpSize);
+		console.log("warp", warpEffect, warpSize);
 		for (let node of this.graph.all()) {
-			node.changeGround(noise.GetNoise(node.pos.x, node.pos.y) * amplitude + base);
+			node.changeGround(base + amplitude * noise.noise(node.pos.add(vec2(xwarp.noise(node.pos), ywarp.noise(node.pos)).mult(warpEffect))));
 		}
 	}
 
@@ -378,7 +378,7 @@ function generate(settings) {
 	let size = settings.size;
 	let graph = time("initialize graph", () => new NodeGraph(settings.seed, vec2(size, size), settings.nodeSize || 8, settings.nodeRandomness));
 	let world = new World(graph);
-	time("heighten", () => world.heighten(settings.amplitude, settings.featureSize, settings.baseHeight));
+	time("heighten", () => world.heighten(settings.amplitude, settings.featureSize, settings.baseHeight, settings.warpSize, settings.warpEffect));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
 	let sorted = time("land", () => world.land(settings));
 	time("drain", () => world.drain(sorted, settings.rainfall));
