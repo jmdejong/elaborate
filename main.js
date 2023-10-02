@@ -229,10 +229,10 @@ class World {
 		this.sediment = {created: 0, deposited: 0, lost: 0};
 	}
 
-	heighten(amplitude, featureSize, base, warpSize, warpEffect) {
-		let noise = new Simplex(this.graph.seed, 8, 1/featureSize);
-		let xwarp = new Simplex(this.graph.seed ^ 123, 4, 1/warpSize);
-		let ywarp = new Simplex(this.graph.seed ^ 321, 4, 1/warpSize);
+	heighten(seed, amplitude, featureSize, base, warpSize, warpEffect) {
+		let noise = new Simplex(seed, 8, 1/featureSize);
+		let xwarp = new Simplex(seed ^ 123, 4, 1/warpSize);
+		let ywarp = new Simplex(seed ^ 321, 4, 1/warpSize);
 		for (let node of this.graph.all()) {
 			node.changeGround(base + amplitude * noise.noise(node.pos.add(vec2(xwarp.noise(node.pos), ywarp.noise(node.pos)).mult(warpEffect))));
 		}
@@ -376,7 +376,7 @@ function generate(settings) {
 	let size = settings.size;
 	let graph = time("initialize graph", () => new NodeGraph(settings.seed, vec2(size, size), settings.nodeSize || 8, settings.nodeRandomness));
 	let world = new World(graph);
-	time("heighten", () => world.heighten(settings.amplitude, settings.featureSize, settings.baseHeight, settings.warpSize, settings.warpEffect));
+	time("heighten", () => world.heighten(settings.seed^61882, settings.amplitude, settings.featureSize, settings.baseHeight, settings.warpSize, settings.warpEffect));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
 	let sorted = time("land", () => world.land(settings));
 	time("drain", () => world.drain(sorted, settings.rainfall));
@@ -385,8 +385,14 @@ function generate(settings) {
 	} else {
 		document.getElementById("partial").hidden = true;
 	}
-	let erosionScale = scaleExp(settings.iterations, settings.erosionStep);
+	let erosionScale = 1;
+	if (settings.compensateErosion) {
+		erosionScale = scaleExp(settings.iterations, settings.erosionStep);
+	}
+	let detailFactor = 1;
 	for (let i=0; i<settings.iterations; ++i) {
+		time("detail", () => world.heighten(settings.seed^(9009*i), settings.detailAmplitude*detailFactor, settings.detailSize*detailFactor, 0, 1, 0));
+		detailFactor *= settings.detailStep;
 		let erosion = settings.erosion * Math.pow(settings.erosionStep, i) * erosionScale;
 		time("erode", () => world.erode(sorted, erosion, settings));
 		if (!(settings.skipFinalDepose &&i === settings.iterations - 1)) {
