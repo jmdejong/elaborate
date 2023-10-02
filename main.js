@@ -3,9 +3,10 @@
 const TRIHEIGHT = 0.866;
 
 class Node {
-	constructor(id, pos) {
+	constructor(id, pos, size) {
 		this.id = id;
 		this.pos = pos;
+		this.size = size;
 		this.baseHeight = 0;
 		this.sink = false;
 		this.reset();
@@ -64,7 +65,7 @@ class NodeGraph {
 				let r = randf(nv, 872 * this.seed);
 				let off = vec2(Math.cos(a), Math.sin(a)).mult((1-r*r)*nodeRandomness/2);
 				let pos = vec2(x + y/2, y*TRIHEIGHT).add(off).mult(this.ns);
-				let node = new Node(nv, pos)
+				let node = new Node(nv, pos, this.ns)
 				this.nodes.set(nv.hash(), node);
 			}
 		}
@@ -99,9 +100,9 @@ class NodeGraph {
 		return sinks.filter(e => e);
 	}
 
-	neighbours(node) {
+	neighbours(node, level) {
 		return [vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1), vec2(1, -1), vec2(-1, 1)]
-			.map(v => this.getNode(v.add(node.id)))
+			.map(v => this.getNode(v.mult(level).add(node.id)))
 			.filter(v => v);
 	}
 
@@ -131,7 +132,7 @@ class NodeGraph {
 	}
 
 	reset() {
-		for (let node of this.nodes.values()) {
+		for (let node of this.all()) {
 			node.reset();
 		}
 	}
@@ -196,20 +197,20 @@ class NodeGraph {
 			});
 		}
 		if (settings.drawCircles) {
-			for (let node of this.nodes.values()) {
+			for (let node of this.all()) {
 				if (node.isSea()) {
-					display.circle(node.pos, this.ns *0.65, "#00c");
+					display.circle(node.pos, node.size *0.65, "#00c");
 				} else if (node.isWaterBody()) {
-					display.circle(node.pos, this.ns *0.65, "#44f");
+					display.circle(node.pos, node.size *0.65, "#44f");
 				} else {
 					let [r, g, b] = color(node.height()).map(c => c*255);
 					let col = `rgb(${r}, ${g}, ${b})`;
-					display.circle(node.pos, this.ns / 2, col);
+					display.circle(node.pos, node.size * 0.5, col);
 				}
 			}
 		}
 		if (settings.drawRivers) {
-			for (let node of this.nodes.values()) {
+			for (let node of this.all()) {
 				if (node.isSink() || node.water < 1.1 || !settings.drawUnderwaterStreams && node.isWaterBody()) {
 					continue;
 				}
@@ -231,9 +232,7 @@ class World {
 	heighten(amplitude, featureSize, base, warpSize, warpEffect) {
 		let noise = new Simplex(this.graph.seed, 8, 1/featureSize);
 		let xwarp = new Simplex(this.graph.seed ^ 123, 4, 1/warpSize);
-		console.log(xwarp);
 		let ywarp = new Simplex(this.graph.seed ^ 321, 4, 1/warpSize);
-		console.log("warp", warpEffect, warpSize);
 		for (let node of this.graph.all()) {
 			node.changeGround(base + amplitude * noise.noise(node.pos.add(vec2(xwarp.noise(node.pos), ywarp.noise(node.pos)).mult(warpEffect))));
 		}
@@ -274,7 +273,7 @@ class World {
 			let node = fringe.take();
 			sorted.push(node);
 			processed.add(node.id.hash());
-			for (let neighbour of this.graph.neighbours(node)) {
+			for (let neighbour of this.graph.neighbours(node, 1)) {
 				if (!visited.has(neighbour.id.hash())) {
 					if (neighbour.height() < node.height()) {
 						if (node.isSea()) {
@@ -304,13 +303,12 @@ class World {
 	}
 
 	drain(nodes, rainfall) {
-		let wetness = rainfall *this.graph.ns*this.graph.ns;
 		for (let i=nodes.length; i--;) {
 			let node = nodes[i];
 			if (node.isSink()) {
 				continue;
 			}
-			node.water += wetness;
+			node.water += rainfall * node.size * node.size;
 			let drains = this.graph.drains(node);
 			for (let drain of drains) {
 				drain.water += node.water / drains.length;
@@ -329,7 +327,7 @@ class World {
 				continue;
 			}
 			let water = drain.isSink() ? 1 : drain.water;
-			let erosion = Math.sqrt(water) * amount / this.graph.ns;
+			let erosion = Math.sqrt(water) * amount / node.size;
 			if (node.isSea()) {
 				erosion *= settings.seaErosion;
 			} else if (node.isWaterBody()) {
