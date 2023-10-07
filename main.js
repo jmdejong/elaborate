@@ -12,10 +12,6 @@ class Node {
 		this.reset();
 	}
 
-	neighbours() {
-		return [vec2(this.id.x + 1, this.id.y), vec2(this.id.x - 1, this.id.y), vec2(this.id.x, this.id.y + 1), vec2(this.id.x, this.id.y - 1)];
-	}
-
 	isSea() {
 		return this.sea || this.isSink();
 	}
@@ -42,7 +38,9 @@ class Node {
 		this.sediment = 0;
 		this.drain = null;
 		this.drains = [];
+		this.outflow = [];
 		this.sea = false;
+		this.momentum = 0;
 	}
 }
 
@@ -72,6 +70,9 @@ class NodeGraph {
 		for (let node of this.sinks()) {
 			node.sink = true;
 		}
+		for (let node of this.nodes.values()) {
+			node.neighbours = this.neighbours(node);
+		}
 	}
 
 	_leftX(y) {
@@ -100,31 +101,18 @@ class NodeGraph {
 		return sinks.filter(e => e);
 	}
 
-	neighbours(node, level) {
+	neighbours(node) {
 		return [vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1), vec2(1, -1), vec2(-1, 1)]
-			.map(v => this.getNode(v.mult(level).add(node.id)))
+			.map(v => this.getNode(v.add(node.id)))
 			.filter(v => v);
 	}
 
-	drain(node) {
-		if (node.drain) {
-			return this.getNode(node.drain);
-		} else {
-			console.error("no drain found", node);
+	drains(node) {
+		if (!node.drains.length) {
+			console.error("no drains found", node);
 			return null;
 		}
-	}
-
-	drains(node) {
-		if (node.isWaterBody()) {
-			if (!node.drains.length) {
-				console.error("no drains found", node);
-				return null;
-			}
-			return node.drains.map(id  => this.getNode(id));
-		} else {
-			return [this.drain(node)];
-		}
+		return node.drains.map(id  => this.getNode(id));
 	}
 
 	all() {
@@ -211,11 +199,15 @@ class NodeGraph {
 		}
 		if (settings.drawRivers) {
 			for (let node of this.all()) {
-				if (node.isSink() || node.water < 1.1 || !settings.drawUnderwaterStreams && node.isWaterBody()) {
+				if (node.isSink() || !settings.drawUnderwaterStreams && node.isWaterBody()) {
 					continue;
 				}
-				for (let drain of this.drains(node)) {
-					display.line(node.pos, drain.pos, "#22f", clamp(Math.sqrt(node.water)/5, 0.5, 5));
+				for (let [drain, o] of node.outflow) {
+					let water = node.water * o
+					if (water < 1.1) {
+						continue;
+					}
+					display.line(node.pos, drain.pos, "#22f", clamp(Math.sqrt(water)/5, 0.5, 5));
 				}
 			}
 		}
@@ -254,12 +246,12 @@ class World {
 		}
 	}
 
-	land(settings) {
+	land(plainsSlope, lakeAmount, lakeSize, lakeDepth) {
 		let noise = new FastNoiseLite(hash(this.graph.seed^23790));
 		noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
 		noise.SetFractalType(FastNoiseLite.FractalType.FBm);
 		noise.SetFractalOctaves(8);
-		noise.SetFrequency(1/settings.lakeSize);
+		noise.SetFrequency(1/lakeSize);
 		let fringe = new PriorityFringe(node => node.height());
 		let visited = new Set();
 		let processed = new Set();
@@ -273,20 +265,20 @@ class World {
 			let node = fringe.take();
 			sorted.push(node);
 			processed.add(node.id.hash());
-			for (let neighbour of this.graph.neighbours(node, 1)) {
+			for (let neighbour of node.neighbours) {
 				if (!visited.has(neighbour.id.hash())) {
 					if (neighbour.height() < node.height()) {
 						if (node.isSea()) {
-							neighbour.waterHeight = node.height() - neighbour.baseHeight + 1e-6 * randf(neighbour.id, this.graph.seed ^ 4890);
+							neighbour.waterHeight = node.height() - neighbour.baseHeight + 1e-7 * (2+randf(neighbour.id, this.graph.seed ^ 4890));
 							neighbour.sea = true;
 						} else {
-							let l = clamp(noise.GetNoise(neighbour.pos.x, neighbour.pos.y) + settings.lakeAmount * 2 - 1, -1, 1);
+							let l = clamp(noise.GetNoise(neighbour.pos.x, neighbour.pos.y) + lakeAmount * 2 - 1, -1, 1);
 							if (l > 0) {
-								neighbour.waterHeight = l * (node.height() - neighbour.height()) * settings.lakeDepth;
+								neighbour.waterHeight = l * (node.height() - neighbour.height()) * lakeDepth;
 								let totalHeight = node.height() + 1e-6 * randf(neighbour.id, this.graph.seed ^ 8429);
 								neighbour.baseHeight = totalHeight - neighbour.waterHeight;
 							} else {
-								neighbour.baseHeight = node.height() + randf(neighbour.id, this.graph.seed ^ 3627) * settings.plainsSlope / (node.height() - neighbour.height() + 1);
+								neighbour.baseHeight = node.height() + randf(neighbour.id, this.graph.seed ^ 3627) * plainsSlope / (node.height() - neighbour.height() + 1);
 							}
 						}
 					}
@@ -294,7 +286,7 @@ class World {
 					fringe.put(neighbour);
 					visited.add(neighbour.id.hash());
 				}
-				if (neighbour.isWaterBody() && !processed.has(neighbour.id.hash()) && !neighbour.isSink()) {
+				if (!processed.has(neighbour.id.hash()) && !neighbour.isSink()) {
 					neighbour.drains.push(node.id);
 				}
 			}
@@ -302,7 +294,7 @@ class World {
 		return sorted;
 	}
 
-	drain(nodes, rainfall) {
+	drain(nodes, rainfall, cohesion, slowing) {
 		for (let i=nodes.length; i--;) {
 			let node = nodes[i];
 			if (node.isSink()) {
@@ -310,30 +302,39 @@ class World {
 			}
 			node.water += rainfall * node.size * node.size;
 			let drains = this.graph.drains(node);
+			let total = 0;
+			let nh = node.height();
+			let outflow = [];
 			for (let drain of drains) {
-				drain.water += node.water / drains.length;
+				let dh = nh - drain.height();
+				node.momentum += dh;
+				let o = node.isWaterBody() ? 1 : dh**cohesion;
+				outflow.push([drain, o]);
+				total += o;
 			}
+			node.momentum *= slowing;
+			node.outflow = outflow.map(([d, o]) => [d, o/total]);
+			for (let [drain, o] of node.outflow) {
+				drain.water += node.water * o;
+				drain.momentum += node.momentum * o;
+			}
+
 		}
 	}
 
-	erode(nodes, amount, settings) {
+	erode(nodes, baseErosion, momentumErosion) {
 		for (let node of nodes) {
 			if (node.isSink()) {
 				continue;
 			}
-			let drain = this.graph.drain(node)
+			let drain = this.graph.drains(node)[0]
 			let dh = (node.baseHeight - drain.baseHeight);
 			if (dh <= 0) {
 				continue;
 			}
 			let water = drain.isSink() ? 1 : drain.water;
-			let erosion = Math.sqrt(water) * amount / node.size;
-			if (node.isSea()) {
-				erosion *= settings.seaErosion;
-			} else if (node.isWaterBody()) {
-				erosion *= settings.lakeErosion;
-			}
-			let newHeight = Math.min(drain.baseHeight + dh / Math.max(1,erosion), node.baseHeight);
+			let erosion = Math.sqrt(water) * (baseErosion + momentumErosion*node.momentum) / node.size;
+			let newHeight = clamp(drain.baseHeight + dh / (1+erosion), drain.baseHeight, node.baseHeight);
 			let eroded = node.baseHeight - newHeight;
 			node.changeGround(-eroded);
 			this.sediment.created += eroded;
@@ -341,7 +342,7 @@ class World {
 		}
 	}
 
-	depose(nodes, amount, lakeDepose) {
+	depose(nodes, amount, depthFactor) {
 		if (amount <= 0) {
 			return;
 		}
@@ -352,17 +353,14 @@ class World {
 				continue;
 			}
 			let drains = this.graph.drains(node);
-			let deposited = node.sediment * amount / node.water;
-			if (node.isWaterBody() && drains.every(n => n.isWaterBody())) {
-				deposited *= lakeDepose;
-			}
+			let deposited = clamp(amount * node.sediment / (node.water+amount) / (node.momentum+1) * (node.waterHeight + depthFactor), 0, node.sediment);
 			node.sediment -= deposited;
 			node.changeGround(deposited);
+
 			this.sediment.deposited += deposited;
 
-			let sediment = node.sediment;
-			for (let drain of drains) {
-				drain.sediment += sediment / drains.length;
+			for (let [drain, o] of node.outflow) {
+				drain.sediment += node.sediment * o;
 			}
 		}
 	}
@@ -378,8 +376,8 @@ function generate(settings) {
 	let world = new World(graph);
 	time("heighten", () => world.heighten(settings.seed^61882, settings.amplitude, settings.featureSize, settings.baseHeight, settings.warpSize, settings.warpEffect));
 	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
-	let sorted = time("land", () => world.land(settings));
-	time("drain", () => world.drain(sorted, settings.rainfall));
+	let sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, settings.lakeDepth));
+	time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, settings.slowing));
 	if (settings.drawPartial) {
 		time("draw partial", () => graph.draw("partial", settings));
 	} else {
@@ -393,14 +391,14 @@ function generate(settings) {
 	for (let i=0; i<settings.iterations; ++i) {
 		time("detail", () => world.heighten(settings.seed^(9009*i), settings.detailAmplitude*detailFactor, settings.detailSize*detailFactor, 0, 1, 0));
 		detailFactor *= settings.detailStep;
-		let erosion = settings.erosion * Math.pow(settings.erosionStep, i) * erosionScale;
-		time("erode", () => world.erode(sorted, erosion, settings));
+		let erosionWeight = Math.pow(settings.erosionStep, i) * erosionScale;
+		time("erode", () => world.erode(sorted, settings.baseErosion * erosionWeight, settings.momentumErosion * erosionWeight));
 		if (!(settings.skipFinalDepose &&i === settings.iterations - 1)) {
-			time("depose", () => world.depose(sorted, settings.deposition, settings.lakeDeposition));
+			time("depose", () => world.depose(sorted, settings.deposition, settings.depositionDepthFactor));
 		}
 		graph.reset();
-		sorted = time("land", () => world.land(settings));
-		time("drain", () => world.drain(sorted, settings.rainfall));
+		sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, 1));
+		time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, settings.slowing));
 	}
 	time("draw", () => graph.draw(null, settings));
 	console.log(`sediment created: ${world.sediment.created / 1e6}, sediment deposited: ${world.sediment.deposited/1e6}, sediment lost: ${world.sediment.lost/1e6}, balance: ${(world.sediment.created - world.sediment.deposited - world.sediment.lost)/1e6}`);

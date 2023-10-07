@@ -55,7 +55,7 @@
 	</label>
 	<label>
 		domain warp effect
-		<input type="number" name="warpEffect" value="0" />
+		<input type="number" name="warpEffect" value="60" />
 	</label>
 	<br />
 
@@ -93,7 +93,7 @@
 	</label>
 	<label>
 		lake size
-		<input type="number" name="lakeSize" value="50" min="1" />
+		<input type="number" name="lakeSize" value="100" min="1" />
 	</label>
 	<label>
 		lake depth
@@ -107,11 +107,11 @@
 	</label>
 	<label>
 		detail amplitude
-		<input type="number" name="detailAmplitude" value="0.0" step="0.01"/>
+		<input type="number" name="detailAmplitude" value="0.05" step="0.01"/>
 	</label>
 	<label>
 		detail factor over iterations
-		<input type="number" name="detailStep" value="0.5" step="0.01" min="0"/>
+		<input type="number" name="detailStep" value="1" step="0.01" min="0"/>
 	</label>
 	<br />
 
@@ -119,19 +119,23 @@
 		rainfall
 		<input type="number" name="rainfall" value="0.005" step="0.001"/>
 	</label>
+	<label>
+		river cohesion
+		<input type="number" name="cohesion" value="9"/>
+	</label>
+	<label>
+		momentum shrink
+		<input type="number" name="slowing" value="0.5" step="0.01"/>
+	</label>
 	<br />
 
 	<label>
-		erosion
-		<input type="number" name="erosion" value="16" />
+		base erosion
+		<input type="number" name="baseErosion" value="0" />
 	</label>
 	<label>
-		sea erosion
-		<input type="number" name="seaErosion" value="1" step="0.01" />
-	</label>
-	<label>
-		lake erosion
-		<input type="number" name="lakeErosion" value="1" step="0.01" />
+		momentum based erosion
+		<input type="number" name="momentumErosion" value="40" />
 	</label>
 	<label>
 		compensate for iterations
@@ -139,22 +143,22 @@
 	</label>
 	<label>
 		erosion factor over iterations
-		<input type="number" name="erosionStep" value="0.5" step="0.01" min="0"/>
+		<input type="number" name="erosionStep" value="1" step="0.01" min="0"/>
 	</label>
 	<br />
 	<label>
-		stream deposition
-		<input type="number" name="deposition" value="0" step="0.001" min="0" max="1"/>
+		deposition
+		<input type="number" name="deposition" value="0.2" step="0.001" min="0" />
 	</label>
 	<label>
-		lake/sea deposition factor
-		<input type="number" name="lakeDeposition" value="0" step="0.1" min="0"/>
+		depth factor
+		<input type="number" name="depositionDepthFactor" value="1" min="0" step="0.01"/>
 	</label>
 	<br />
 
 	<label>
 		iterations
-		<input type="number" name="iterations" value="1" min="0" />
+		<input type="number" name="iterations" value="2" min="0" />
 	</label>
 	<label>
 		skip final depose step
@@ -168,11 +172,11 @@
 	</label>
 	<label>
 		draw underwater streams
-		<input type="checkbox" name="drawUnderwaterStreams" />
+		<input type="checkbox" name="drawUnderwaterStreams" checked/>
 	</label>
 	<label>
 		draw circles
-		<input type="checkbox" name="drawCircles" checked />
+		<input type="checkbox" name="drawCircles" />
 	</label>
 	<label>
 		draw area
