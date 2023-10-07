@@ -368,18 +368,21 @@ class World {
 
 
 
-function generate(settings) {
+async function generate(settings) {
 	console.log("  start generating", settings);
 	let startTime = Date.now();
 	let size = settings.size;
-	let graph = time("initialize graph", () => new NodeGraph(settings.seed, vec2(size, size), settings.nodeSize || 8, settings.nodeRandomness));
+	document.getElementById("nodecount").textContent = "";
+	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
+	let graph = await time("initialize graph", () => new NodeGraph(settings.seed, vec2(size, size), settings.nodeSize || 8, settings.nodeRandomness));
+	document.getElementById("nodecount").textContent = graph.nodes.size
 	let world = new World(graph);
-	time("heighten", () => world.heighten(settings.seed^61882, settings.amplitude, settings.featureSize, settings.baseHeight, settings.warpSize, settings.warpEffect));
-	time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
-	let sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, settings.lakeDepth));
-	time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, settings.slowing));
+	await time("heighten", () => world.heighten(settings.seed^61882, settings.amplitude, settings.featureSize, settings.baseHeight, settings.warpSize, settings.warpEffect));
+	await time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
+	let sorted = await time("flow", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, settings.lakeDepth));
+	await time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, settings.slowing));
 	if (settings.drawPartial) {
-		time("draw partial", () => graph.draw("partial", settings));
+		await time("draw partial", () => graph.draw("partial", settings));
 	} else {
 		document.getElementById("partial").hidden = true;
 	}
@@ -389,23 +392,23 @@ function generate(settings) {
 	}
 	let detailFactor = 1;
 	for (let i=0; i<settings.iterations; ++i) {
-		time("detail", () => world.heighten(settings.seed^(9009*i), settings.detailAmplitude*detailFactor, settings.detailSize*detailFactor, 0, 1, 0));
+		await time("detail", () => world.heighten(settings.seed^(9009*i), settings.detailAmplitude*detailFactor, settings.detailSize*detailFactor, 0, 1, 0));
 		detailFactor *= settings.detailStep;
 		let erosionWeight = Math.pow(settings.erosionStep, i) * erosionScale;
-		time("erode", () => world.erode(sorted, settings.baseErosion * erosionWeight, settings.momentumErosion * erosionWeight));
+		await time("erode", () => world.erode(sorted, settings.baseErosion * erosionWeight, settings.momentumErosion * erosionWeight));
 		if (!(settings.skipFinalDepose &&i === settings.iterations - 1)) {
-			time("depose", () => world.depose(sorted, settings.deposition, settings.depositionDepthFactor));
+			await time("depose", () => world.depose(sorted, settings.deposition, settings.depositionDepthFactor));
 		}
 		graph.reset();
-		sorted = time("land", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, 1));
-		time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, settings.slowing));
+		sorted = await time("flow", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, 1));
+		await time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, settings.slowing));
 	}
-	time("draw", () => graph.draw(null, settings));
+	await time("draw", () => graph.draw(null, settings));
 	console.log(`sediment created: ${world.sediment.created / 1e6}, sediment deposited: ${world.sediment.deposited/1e6}, sediment lost: ${world.sediment.lost/1e6}, balance: ${(world.sediment.created - world.sediment.deposited - world.sediment.lost)/1e6}`);
 	let endTime = Date.now();
 	console.log("  generate done", (endTime - startTime) / 1000);
 	window.world = world;
-	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
+	document.getElementById("status").textContent = `generate done  ${(endTime - startTime) / 1000}s`
 }
 
 function readSettings(form) {

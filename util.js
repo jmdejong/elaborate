@@ -16,9 +16,15 @@ function hash(num) {
 
 function time(description, fn) {
 	let startTime = Date.now();
-	let ret = fn();
-	let endTime = Date.now();
-	console.log(description, (endTime - startTime) / 1000);
+	document.getElementById("status").textContent = "generating: " + description;
+	let ret = new Promise((resolve) => {
+		requestAnimationFrame(() => {
+			let r = fn();
+			let endTime = Date.now();
+			console.log(description, (endTime - startTime) / 1000);
+			resolve(r);
+		});
+	});
 	return ret;
 }
 
