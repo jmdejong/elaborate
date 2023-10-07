@@ -204,10 +204,19 @@ class NodeGraph {
 				}
 				for (let [drain, o] of node.outflow) {
 					let water = node.water * o
-					if (water < 1.1) {
+					if (water < settings.riverMin) {
 						continue;
 					}
-					display.line(node.pos, drain.pos, "#22f", clamp(Math.sqrt(water)/5, 0.5, 5));
+					display.line(
+						node.pos,
+						drain.pos,
+						"#22f",
+						clamp(
+							Math.sqrt(water)*settings.riverScale,
+							settings.riverMinWidth,
+							settings.riverMaxWidth
+						)
+					);
 				}
 			}
 		}
