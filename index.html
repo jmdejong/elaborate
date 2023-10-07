@@ -17,7 +17,7 @@
 <body>
 <canvas id="worldlevel"></canvas>
 <canvas id="partial" hidden></canvas>
-
+<div id="status"></div>
 <form id="settings" class="settings" action="javascript:void(0);">
 	<label>
 		seed
@@ -135,7 +135,7 @@
 	</label>
 	<label>
 		momentum based erosion
-		<input type="number" name="momentumErosion" value="40" />
+		<input type="number" name="momentumErosion" value="150" />
 	</label>
 	<label>
 		compensate for iterations
@@ -195,7 +195,6 @@
 	<input type="submit" value="Generate" />
 </form>
 <div>
-	<div id="status"></div>
 	<div>#nodes: <span id="nodecount"></span></div>
 	Current settings:
 	<pre id="currentsettings"></pre>

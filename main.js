@@ -373,7 +373,10 @@ async function generate(settings) {
 	let startTime = Date.now();
 	let size = settings.size;
 	document.getElementById("nodecount").textContent = "";
-	document.getElementById("currentsettings").textContent = JSON.stringify(settings, null, 2);
+	document.getElementById("currentsettings").textContent =
+		Object.entries(settings)
+			.map(([k, v]) => `${k}: ${v}`)
+			.join("\n");
 	let graph = await time("initialize graph", () => new NodeGraph(settings.seed, vec2(size, size), settings.nodeSize || 8, settings.nodeRandomness));
 	document.getElementById("nodecount").textContent = graph.nodes.size
 	let world = new World(graph);
