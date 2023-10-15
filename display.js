@@ -40,9 +40,9 @@ class Display {
 			for (let y=0; y<this.canvas.height; ++y) {
 				let [r, g, b] = fn(vec2(x, y));
 				let i = (x + y * this.canvas.width) * 4;
-				data[i] = r*255|0;
-				data[i+1] = g*255|0;
-				data[i+2] = b*255|0;
+				data[i] = r|0;
+				data[i+1] = g|0;
+				data[i+2] = b|0;
 				data[i+3] = 255;
 			}
 		}

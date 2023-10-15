@@ -11,6 +11,7 @@
 <script src="vec2.js"></script>
 <script src="noise.js"></script>
 <script src="display.js"></script>
+<script src="colors.js"></script>
 <script src="main.js"></script>
 <link href="style.css" rel="stylesheet" />
 </head>
@@ -202,6 +203,13 @@
 		river width max
 		<input type="number" name="riverMaxWidth" value="5" step="0.01" />
 	</label>
+	<br />
+	</label>
+		color scale
+		<input type="text" id="colorscale" name="colorScale" value="#070,#0d0,#7d0,#dc0,#d70,#d30,#f00,#b00,#700,#300,#000" />
+	</label>
+	<br />
+	<canvas id="colorpreview" width=500 height=20></canvas>
 	<br />
 
 	<input type="submit" value="Generate" />

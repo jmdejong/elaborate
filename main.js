@@ -144,18 +144,6 @@ class NodeGraph {
 	}
 
 	draw(id, settings) {
-		let colors = [[0, 0.5, 0], [0.0, 0.9, 0.0], [0.5, 0.9, 0.1], [0.9, 0.85, 0.2], [0.8, 0.6, 0.0], [0.9, 0.2, 0], [1, 0, 0], [0.75, 0, 0], [0.5, 0, 0], [0.25, 0, 0], [0, 0, 0]];
-		let colorscale = colors.length / settings.colorMax;
-		function color(height) {
-			let h = clamp(height * colorscale, 0, colors.length -1);
-			let prev = colors[Math.floor(h)];
-			let next = colors[Math.ceil(h)];
-			let dh = h-Math.floor(h);
-			return [0, 1, 2].map(i => prev[i] * (1-dh) + next[i] * dh);
-		}
-		if (!id) {
-			id = "worldlevel";
-		}
 		let canvas = document.getElementById(id);
 		canvas.hidden = false;
 		canvas.width = this.size.x;
@@ -165,11 +153,11 @@ class NodeGraph {
 			display.eachPixel(p => {
 				let n = this.nearest(p);
 				if (n.isSea()) {
-					return [0, 0, 0.9];
+					return [0, 0, 225];
 				} else if (n.isWaterBody()) {
-					return [0.3, 0.3, 1];
+					return [76, 76, 255];
 				} else {
-					return color(n.height());
+					return settings.colorScale.rgbBytes(n.height() / settings.colorMax);
 				}
 			});
 		}
@@ -180,9 +168,7 @@ class NodeGraph {
 				} else if (node.isWaterBody()) {
 					display.circle(node.pos, node.size *0.65, "#44f");
 				} else {
-					let [r, g, b] = color(node.height()).map(c => c*255);
-					let col = `rgb(${r}, ${g}, ${b})`;
-					display.circle(node.pos, node.size * 0.5, col);
+					display.circle(node.pos, node.size * 0.5, settings.colorScale.name(node.height() / settings.colorMax));
 				}
 			}
 		}
@@ -381,8 +367,6 @@ class World {
 	}
 }
 
-
-
 async function generate(settings) {
 	console.log("  start generating", settings);
 	let startTime = Date.now();
@@ -417,7 +401,7 @@ async function generate(settings) {
 		sorted = await time("flow", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, 1, settings.baseErosion * erosionWeight, settings.momentumErosion * erosionWeight));
 		await time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, Math.pow(settings.slowing, settings.nodeSize)));
 	}
-	await time("draw", () => graph.draw(null, settings));
+	await time("draw", () => graph.draw("worldlevel", settings));
 	console.log(`sediment created: ${world.sediment.created / 1e6}, sediment deposited: ${world.sediment.deposited/1e6}, sediment lost: ${world.sediment.lost/1e6}, balance: ${(world.sediment.created - world.sediment.deposited - world.sediment.lost)/1e6}`);
 	let endTime = Date.now();
 	console.log("  generate done", (endTime - startTime) / 1000);
@@ -427,11 +411,15 @@ async function generate(settings) {
 
 function readSettings(form) {
 	function n(input) {
-		if (input.type === "number") {
+		if (input.id === "colorscale") {
+			return ColorScale.fromInput(input, "colorpreview");
+		} else if (input.type === "number") {
 			return +(input.value || input.defaultValue);
 		} else if (input.type === "checkbox") {
 			return input.checked;
 		} else if (input.type === "select-one") {
+			return input.value;
+		} else if (input.type === "text") {
 			return input.value;
 		} else {
 			console.error(`unknown input type '${input.type}'`, input);
@@ -452,6 +440,9 @@ function readSettings(form) {
 function main() {
 	let form = document.getElementById("settings");
 	form.addEventListener("submit", e => generate(readSettings(e.target.elements)));
+	let colorInput = document.getElementById("colorscale")
+	colorInput.addEventListener("input", e => ColorScale.fromInput(e.target, "colorpreview"));
+	ColorScale.fromInput(colorInput, "colorpreview");
 	generate(readSettings(form.elements));
 }
 
