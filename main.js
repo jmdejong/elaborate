@@ -323,26 +323,6 @@ class World {
 		}
 	}
 
-	erode(nodes, baseErosion, momentumErosion) {
-		for (let node of nodes) {
-			if (node.isSink()) {
-				continue;
-			}
-			let drain = this.graph.drains(node)[0]
-			let dh = (node.baseHeight - drain.baseHeight);
-			if (dh <= 0) {
-				continue;
-			}
-			let water = drain.isSink() ? 1 : drain.water;
-			let erosion = Math.sqrt(water) * (baseErosion + momentumErosion*node.momentum) / node.size;
-			let newHeight = clamp(drain.baseHeight + dh / (1+erosion), drain.baseHeight, node.baseHeight);
-			let eroded = node.baseHeight - newHeight;
-			node.changeGround(-eroded);
-			this.sediment.created += eroded;
-			node.sediment += eroded;
-		}
-	}
-
 	depose(nodes, amount, depthFactor) {
 		if (amount <= 0) {
 			return;
@@ -438,12 +418,17 @@ function readSettings(form) {
 }
 
 function main() {
-	let form = document.getElementById("settings");
-	form.addEventListener("submit", e => generate(readSettings(e.target.elements)));
 	let colorInput = document.getElementById("colorscale")
 	colorInput.addEventListener("input", e => ColorScale.fromInput(e.target, "colorpreview"));
 	ColorScale.fromInput(colorInput, "colorpreview");
+
+	let form = document.getElementById("settings");
+	form.addEventListener("submit", e => generate(readSettings(e.target.elements)));
 	generate(readSettings(form.elements));
+
+	document.getElementById("redraw").addEventListener("click", e => {
+		window.world.graph.draw("worldlevel", readSettings(form.elements));
+	});
 }
 
 window.addEventListener("load", main);
