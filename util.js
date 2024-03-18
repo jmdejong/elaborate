@@ -16,7 +16,6 @@ function hash(num) {
 
 function time(description, fn) {
 	let startTime = Date.now();
-	document.getElementById("status").textContent = "generating: " + description;
 	let ret = new Promise((resolve) => {
 		requestAnimationFrame(() => {
 			let r = fn();

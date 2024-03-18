@@ -7,6 +7,11 @@ class Display {
 		this.ctx = canvas.getContext("2d");
 	}
 
+	resize(size) {
+		this.canvas.width = size.x;
+		this.canvas.height = size.y;
+	}
+
 	line(v1, v2, color, width) {
 		if (!color) {
 			color = "black";
