@@ -1,11 +1,5 @@
 
 
-
-
-const movementSpeed = 2;
-const boostSpeed = 20;
-
-
 class Input {
 
 	constructor(mapping) {
@@ -30,6 +24,8 @@ class ThreeView {
 
 	constructor() {
 
+		this.movementSpeed = 1;
+		this.boostSpeed = 10;
 		let canvas = document.getElementById("world3d");
 		this.scene = new THREE.Scene();
 		this.camera = new THREE.PerspectiveCamera( 85, window.innerWidth / window.innerHeight, 0.1, 1000 );
@@ -73,11 +69,13 @@ class ThreeView {
 		this.input.initialize();
 
 		this.camera.position.z = 5;
-		this.camera.position.y = 50;
+		this.camera.position.y = 200;
 		this.camera.rotation.order = "YXZ";
+		this.camera.rotation.x = -Math.PI / 3;
+		this.camera.rotation.y = -Math.PI * 3 / 4;
 
 		const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-		directionalLight.position.set(0.1, 1, 0.8);
+		directionalLight.position.set(0.1, 1, 0.4);
 		this.scene.add(directionalLight);
 		const ambientLight = new THREE.AmbientLight( 0x404040 ); // soft white light
 		this.scene.add(ambientLight);
@@ -86,36 +84,38 @@ class ThreeView {
 	}
 
 
-	drawWorldGraph(graph, settings) {
+	drawWorldGraph(graph) {
 		console.log("drawing graph 3d");
-		let v = [];
-		let c = []
+		let settings = readSettings(document.getElementById("draw3dsettings"));
+		console.log(settings);
+		this.movementSpeed = settings.movementSpeed;
+		this.boostSpeed = settings.boostSpeed;
+		let vertices = [];
+		let colors = []
 		for (let triangle of graph.triangles()) {
 			for (let node of triangle) {
-				v.push(node.pos.x, node.height() * 64, node.pos.y);
+				vertices.push(node.pos.x * settings.horizontalScale, node.height() * settings.heightScale, node.pos.y * settings.horizontalScale);
 				if (node.isSea()) {
-					c.push(0, 0, 225);
+					colors.push(0, 0, 225);
 				} else if (node.isWaterBody()) {
-					c.push(76, 76, 255);
+					colors.push(76, 76, 255);
 				} else {
-					c.push(...settings.colorScale.rgbFloats(node.height() / settings.colorMax));
+					colors.push(...settings.colorScale.rgbFloats(node.height() / settings.colorMax));
 				}
 			}
 		}
-		let vertices = new Float32Array(v);
-		let colors = new Float32Array(c);
-		console.log(colors);
 
 		const geometry = new THREE.BufferGeometry();
-
-		geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+		geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+		geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
 		geometry.computeBoundingBox();
 		geometry.computeVertexNormals()
 
-		let ground = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({vertexColors: true}));
-		ground.position.x -= settings.size / 2;
-		ground.position.z -= settings.size / 2;
+		let ground = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({vertexColors: true}));
+		if (settings.centerMesh) {
+			ground.position.x -= graph.size.x * settings.horizontalScale / 2;
+			ground.position.z -= graph.size.y * settings.horizontalScale / 2;
+		}
 		this.scene.remove(this.currentGround);
 		this.scene.add(ground);
 		this.currentGround = ground;
@@ -140,7 +140,7 @@ class ThreeView {
 				this.input.inputs.up - this.input.inputs.down,
 				this.input.inputs.back - this.input.inputs.forward,
 			)
-			.multiplyScalar(elapsed * (this.input.inputs.boost ? boostSpeed : movementSpeed))
+			.multiplyScalar(elapsed * (this.input.inputs.boost ? this.boostSpeed : this.movementSpeed))
 			.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camera.rotation.y);
 
 		this.camera.position.add(movement);
@@ -159,7 +159,7 @@ async function render3d() {
 		view = new ThreeView();
 	}
 	view.show();
-	view.drawWorldGraph(world.graph, readSettings(document.getElementById("settings").elements));
+	view.drawWorldGraph(world.graph);
 
 	let previousTimestamp = null;
 
@@ -179,9 +179,9 @@ function close3d() {
 	view.hide();
 }
 
-let button = document.getElementById("draw3d")
-button.addEventListener("click", render3d)
-button.hidden = false;
+let settingsForm = document.getElementById("draw3dsettings");
+settingsForm.addEventListener("submit", render3d);
+settingsForm.hidden = false;
 
 document.getElementById("close3d").addEventListener("click", close3d);
 

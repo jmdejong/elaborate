@@ -27,7 +27,7 @@
 <canvas id="worldlevel" class="canvas2d"></canvas>
 <canvas id="partial" class="canvas2d" hidden></canvas>
 <div id="status"></div>
-<form id="settings" class="settings" action="javascript:void(0);">
+<form id="worldsettings" class="settings" action="javascript:void(0);">
 	<label>
 		seed
 		<input type="number" name="seed" />
@@ -171,6 +171,10 @@
 	</label>
 	<br />
 
+	<input type="submit" value="Generate" />
+</form>
+
+<form id="drawsettings" class="settings" action="javascript:void(0);">
 	<label>
 		draw rivers
 		<input type="checkbox" name="drawRivers" checked />
@@ -195,8 +199,6 @@
 		draw pre-erosion result
 		<input type="checkbox" name="drawPartial" />
 	</label>
-	<button id="redraw" type="button">Redraw</button>
-	<button id="draw3d" type="button" hidden>Render 3d</button>
 	<br />
 	</label>
 		minimum water in river
@@ -217,14 +219,56 @@
 	<br />
 	</label>
 		color scale
-		<input type="text" id="colorscale" name="colorScale" value="#070,#0d0,#7d0,#dc0,#d70,#d30,#f00,#b00,#700,#300,#000" />
+		<input type="text" class="colorscale" id="colorscale" name="colorScale" value="#070,#0d0,#7d0,#dc0,#d70,#d30,#f00,#b00,#700,#300,#000" />
+		<br />
+		<canvas class="colorpreview" width=500 height=20></canvas>
 	</label>
 	<br />
-	<canvas id="colorpreview" width=500 height=20></canvas>
+
+	<input type="submit" value="Redraw" />
+	<button id="draw3d" type="button" hidden>Render 3d</button>
+</form>
+
+<form id="draw3dsettings" class="settings" action="javascript:void(0);" hidden>
+	<label>
+		center mesh
+		<input type="checkbox" name="centerMesh" checked />
+	</label>
+	<label>
+		height scale
+		<input type="number" name="heightScale" value="64" step="0.01" min="0" />
+	</label>
+	<label>
+		horizontal scale
+		<input type="number" name="horizontalScale" value="1" step="0.01" min="0" />
+	</label>
 	<br />
 
-	<input type="submit" value="Generate" />
+	<label>
+		height of max color
+		<input type="number" name="colorMax" value="2" step="0.1" min="0" />
+	</label>
+	</label>
+		color scale
+		<input type="text" class="colorscale" id="colorscale3d" name="colorScale" value="#070,#0d0,#7d0,#dc0,#d70,#d30,#f00,#b00,#700,#300,#000" />
+		<br />
+		<canvas class="colorpreview" width=500 height=20></canvas>
+	</label>
+	<br />
+
+	</label>
+		camera movement speed
+		<input type="number" name="movementSpeed" value="10" step="0.1" />
+	</label>
+	</label>
+		boosted movement speed
+		<input type="number" name="boostSpeed" value="100" step="0.1" />
+	</label>
+	<br />
+
+	<input type="submit" value="Render 3D" />
 </form>
+
 <div>
 	<div>#nodes: <span id="nodecount"></span></div>
 	Current settings:

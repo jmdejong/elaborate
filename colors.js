@@ -2,8 +2,7 @@
 
 class ColorScale {
 
-	static fromColorNames(colorNames, canvasId) {
-		let canvas = document.getElementById(canvasId);
+	static fromColorNames(colorNames, canvas) {
 		let ctx = canvas.getContext("2d");
 		let gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
 		for (let i=0; i<colorNames.length; ++i) {

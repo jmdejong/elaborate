@@ -2,7 +2,9 @@
 
 class CanvasView {
 
-	drawGraph(graph, settings, displayId) {
+	drawGraph(graph, displayId) {
+		let settings = readSettings(document.getElementById("drawsettings"));
+
 		let canvas = document.getElementById(displayId);
 		canvas.hidden = false;
 		let display = new Display(canvas);
@@ -56,12 +58,12 @@ class CanvasView {
 		}
 	}
 
-	drawWorldGraph(graph, settings) {
-		this.drawGraph(graph, settings, "worldlevel")
+	drawWorldGraph(graph) {
+		this.drawGraph(graph, "worldlevel")
 	}
 
-	drawPartialGraph(graph, settings) {
-		this.drawGraph(graph, settings, "partial")
+	drawPartialGraph(graph) {
+		this.drawGraph(graph, "partial")
 	}
 
 	hidePartialDisplay() {
@@ -95,8 +97,8 @@ class CanvasView {
 
 function readSettings(form) {
 	function n(input) {
-		if (input.id === "colorscale") {
-			return ColorScale.fromInput(input, "colorpreview");
+		if (input.classList.contains("colorscale")) {
+			return ColorScale.fromInput(input, input.parentElement.getElementsByTagName("canvas")[0]);
 		} else if (input.type === "number") {
 			return +(input.value || input.defaultValue);
 		} else if (input.type === "checkbox") {
@@ -110,7 +112,7 @@ function readSettings(form) {
 		}
 	}
 	let settings = {};
-	for (let input of form) {
+	for (let input of form.elements) {
 		if (input.name) {
 			settings[input.name] = n(input);
 		}
@@ -122,18 +124,22 @@ function readSettings(form) {
 }
 
 function main() {
-	let colorInput = document.getElementById("colorscale")
-	colorInput.addEventListener("input", e => ColorScale.fromInput(e.target, "colorpreview"));
-	ColorScale.fromInput(colorInput, "colorpreview");
+	for (let colorInput of document.getElementsByClassName("colorscale")) {
+		let preview = colorInput.parentElement.getElementsByClassName("colorpreview")[0];
+		colorInput.addEventListener("input", e => ColorScale.fromInput(e.target, preview));
+		ColorScale.fromInput(colorInput, preview);
+	}
 
 	let view = new CanvasView();
 
-	let form = document.getElementById("settings");
-	form.addEventListener("submit", e => generate(readSettings(e.target.elements), view));
-	generate(readSettings(form.elements), view);
+	let form = document.getElementById("worldsettings");
+	form.addEventListener("submit", e => {
+		generate(readSettings(e.target), view)
+	});
+	generate(readSettings(form), view);
 
-	document.getElementById("redraw").addEventListener("click", e => {
-		view.drawWorldGraph(world.graph, readSettings(form.elements));
+	document.getElementById("drawsettings").addEventListener("submit", e => {
+		view.drawWorldGraph(world.graph);
 	});
 }
 
