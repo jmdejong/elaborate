@@ -24,7 +24,7 @@ class Node {
 	}
 
 	isWaterBody() {
-		return this.isSea() || this.waterHeight > 0;
+		return this.isSea() || this.waterHeight > this.baseHeight+1e-8;
 	}
 
 	isSink() {
@@ -32,7 +32,11 @@ class Node {
 	}
 
 	height() {
-		return this.baseHeight + this.waterHeight;
+		return Math.max(this.baseHeight, this.waterHeight);
+	}
+
+	waterVolume() {
+		return Math.max(this.waterHeight - this.baseHeight, 0);
 	}
 
 	changeGround(ground) {
@@ -206,7 +210,7 @@ class World {
 		for (let node of this.graph.sinks()) {
 			fringe.put(node);
 			visited.add(node.id.hash());
-			node.waterHeight = Math.max(0, -node.baseHeight);
+			node.waterHeight = 0;
 		}
 		while (!fringe.isEmpty()) {
 			let node = fringe.take();
@@ -215,32 +219,32 @@ class World {
 			for (let neighbour of node.neighbours) {
 				if (!visited.has(neighbour.id.hash())) {
 					let dh = neighbour.baseHeight - node.baseHeight;
-					if (dh > 0 && !neighbour.waterHeight) {
+					if (dh > 0 && !neighbour.isWaterBody()) {
 						let water = node.isSink() ? 1 : node.water;
 						let erosion = Math.sqrt(water) * (baseErosion + momentumErosion*neighbour.momentum) / neighbour.size;
 						let newHeight = clamp(node.baseHeight + dh / (1+erosion), node.baseHeight, neighbour.baseHeight);
 						let eroded = neighbour.baseHeight - newHeight;
+						if (!eroded && eroded !== 0) {
+							console.log("erosion error", erosion, water, baseErosion, momentumErosion, neighbour.momentum, neighbour.size);
+						}
 						neighbour.changeGround(-eroded);
 						this.sediment.created += eroded;
 						neighbour.sediment += eroded;
 					}
-					neighbour.waterHeight = 0;
+					neighbour.waterHeight = -1e9;
 					neighbour.sea = false;
 					neighbour.drains = [];
 					if (neighbour.height() < node.height()) {
+						neighbour.waterHeight = node.height() + 1e-7 * (2+randf(neighbour.id, this.graph.seed ^ 4890));
 						if (node.isSea()) {
-							neighbour.waterHeight = node.height() - neighbour.baseHeight + 1e-7 * (2+randf(neighbour.id, this.graph.seed ^ 4890));
+							// neighbour.waterHeight = node.waterHeight + 1e-7 * (2+randf(neighbour.id, this.graph.seed ^ 4890));
 							neighbour.sea = true;
 						} else {
-							let l = clamp(noise.GetNoise(neighbour.pos.x, neighbour.pos.y) + lakeAmount * 2 - 1, -1, 1);
-							if (l > 0) {
-								neighbour.waterHeight = l * (node.height() - neighbour.height()) * lakeDepth;
-								let totalHeight = node.height() + 1e-6 * randf(neighbour.id, this.graph.seed ^ 8429);
-								neighbour.baseHeight = totalHeight - neighbour.waterHeight;
-							} else {
-								neighbour.baseHeight = node.height() + randf(neighbour.id, this.graph.seed ^ 3627) * plainsSlope / (node.height() - neighbour.height() + 1);
-							}
+							let l = clamp(noise.GetNoise(neighbour.pos.x, neighbour.pos.y) + lakeAmount * 2 - 1, 0, 1) * lakeDepth;
+							neighbour.baseHeight = neighbour.baseHeight * l + neighbour.waterHeight * (1-l);
 						}
+					} else {
+						neighbour.waterHeight = node.waterHeight + 1e-7 * (2+randf(neighbour.id, this.graph.seed ^ 8429));
 					}
 					fringe.put(neighbour);
 					visited.add(neighbour.id.hash());
@@ -271,6 +275,9 @@ class World {
 			let outflow = [];
 			for (let drain of drains) {
 				let dh = nh - drain.height();
+				if (!(dh >= 0)) {
+					console.log("drain order error", dh, nh, dh);
+				}
 				node.momentum += dh;
 				let o = node.isWaterBody() ? 1 : dh**cohesion;
 				outflow.push([drain, o]);
@@ -298,14 +305,31 @@ class World {
 				continue;
 			}
 			let drains = this.graph.drains(node);
-			let deposited = clamp((amount +node.waterHeight * depthFactor) * node.sediment / (node.water+amount) / (node.momentum+1), 0, node.sediment);
+			let deposited = clamp((amount + node.waterVolume()* depthFactor) * node.sediment / (node.water+amount) / (node.momentum+1), 0, node.sediment);
 			node.sediment -= deposited;
+			if (!deposited && deposited !== 0) {
+				console.log("deposit error", deposited);
+			}
 			node.changeGround(deposited);
 			this.sediment.deposited += deposited;
 			for (let [drain, o] of node.outflow) {
 				drain.sediment += node.sediment * o;
 			}
 			node.sediment = 0;
+		}
+	}
+
+	amplifyWater() {
+		for (let node of this.graph.all()) {
+			if (node.isWaterBody()) {
+				continue;
+			}
+			let wetNeighbours = node.neighbours.filter(n => n.isWaterBody());
+			if (wetNeighbours.length) {
+				node.waterHeight = Math.min(node.height(), wetNeighbours.reduce((acc, n) => acc + n.waterHeight, 0) / wetNeighbours.length)
+			} else {
+				node.waterHeight = -1e6;
+			}
 		}
 	}
 }
@@ -341,6 +365,7 @@ async function generate(settings, view) {
 		sorted = await view.time("flow", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, 1, settings.baseErosion * erosionWeight, settings.momentumErosion * erosionWeight));
 		await view.time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, Math.pow(settings.slowing, settings.nodeSize)));
 	}
+	await view.time("amplify water", () => world.amplifyWater());
 	await view.time("draw", () => view.drawWorldGraph(graph, settings));
 	console.log(`sediment created: ${world.sediment.created / 1e6}, sediment deposited: ${world.sediment.deposited/1e6}, sediment lost: ${world.sediment.lost/1e6}, balance: ${(world.sediment.created - world.sediment.deposited - world.sediment.lost)/1e6}`);
 	let endTime = Date.now();

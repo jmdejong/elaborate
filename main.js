@@ -18,6 +18,10 @@ class CanvasView {
 				} else if (n.isWaterBody()) {
 					return [76, 76, 255];
 				} else {
+					let v = n.height();
+					if (v != v) {
+						console.log(n);
+					}
 					return settings.colorScale.rgbBytes(n.height() / settings.colorMax);
 				}
 			});

@@ -79,7 +79,7 @@ class ThreeView {
 		this.scene.add(directionalLight);
 		const ambientLight = new THREE.AmbientLight(0x88888888);
 		this.scene.add(ambientLight);
-		this.currentGround = null;
+		this.terrain = null;
 		this.visible = false;
 	}
 
@@ -88,45 +88,43 @@ class ThreeView {
 		console.log("drawing graph 3d");
 		let settings = readSettings(document.getElementById("draw3dsettings"));
 		console.log(settings);
+		this.camera.fov = settings.fov
+		this.camera.updateProjectionMatrix();
 		this.movementSpeed = settings.movementSpeed;
 		this.boostSpeed = settings.boostSpeed;
+
+		let terrain = new THREE.Group()
+
 		let vertices = [];
+		let waterVertices = []
 		let colors = []
 		let indices = [];
-		if (settings.flatFaces) {
-			for (let triangle of graph.triangles()) {
-				for (let node of triangle) {
-					vertices.push(node.pos.x * settings.horizontalScale, node.height() * settings.heightScale, node.pos.y * settings.horizontalScale);
-					if (node.isSea()) {
-						colors.push(0, 0, 0.9);
-					} else if (node.isWaterBody()) {
-						colors.push(0.2, 0.2, 1);
-					} else {
-						colors.push(...settings.colorScale.rgbFloats(node.height() / settings.colorMax));
-					}
-				}
-			}
-		} else {
-			let nodeIndex = new Map();
-			let i = 0;
-			for (let node of graph.all()) {
-				vertices.push(node.pos.x * settings.horizontalScale, node.height() * settings.heightScale, node.pos.y * settings.horizontalScale);
-				if (node.isSea()) {
-					colors.push(0, 0, 0.9);
-				} else if (node.isWaterBody()) {
-					colors.push(0.2, 0.2, 1);
-				} else {
-					colors.push(...settings.colorScale.rgbFloats(node.height() / settings.colorMax));
-				}
-				nodeIndex.set(node.id.hash(), i++);
-			}
+		let nodes = settings.flatFaces ? [...graph.triangles()].flatMap(triangle => triangle) : graph.all();
+		let nodeIndex = new Map();
+		let i = 0;
+		for (let node of nodes) {
+			vertices.push(node.pos.x * settings.horizontalScale, node.baseHeight * settings.heightScale, node.pos.y * settings.horizontalScale);
+			waterVertices.push(node.pos.x * settings.horizontalScale, node.waterHeight * settings.heightScale, node.pos.y * settings.horizontalScale);
+			colors.push(...settings.colorScale.rgbFloats(node.baseHeight / settings.colorMax));
+			nodeIndex.set(node.id.hash(), i++);
+		}
 
-			for (let triangle of graph.triangles()) {
-				for (let node of triangle) {
-					indices.push(nodeIndex.get(node.id.hash()));
-				}
+		for (let triangle of graph.triangles()) {
+			for (let node of triangle) {
+				indices.push(nodeIndex.get(node.id.hash()));
 			}
 		}
+
+		const waterGeometry = new THREE.BufferGeometry();
+		waterGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(waterVertices), 3));
+		if (!settings.flatFaces) {
+			waterGeometry.setIndex(indices);
+		}
+		waterGeometry.computeBoundingBox();
+		waterGeometry.computeVertexNormals()
+		let water = new THREE.Mesh(waterGeometry, new THREE.MeshStandardMaterial({color: 0x0000ff}));
+		water.position.y -= 1e-6;
+		terrain.add(water);
 
 		const geometry = new THREE.BufferGeometry();
 		geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
@@ -138,13 +136,20 @@ class ThreeView {
 		geometry.computeVertexNormals()
 
 		let ground = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({vertexColors: true}));
+		terrain.add(ground);
+
+
 		if (settings.centerMesh) {
-			ground.position.x -= graph.size.x * settings.horizontalScale / 2;
-			ground.position.z -= graph.size.y * settings.horizontalScale / 2;
+			terrain.position.x -= graph.size.x * settings.horizontalScale / 2;
+			terrain.position.z -= graph.size.y * settings.horizontalScale / 2;
 		}
-		this.scene.remove(this.currentGround);
-		this.scene.add(ground);
-		this.currentGround = ground;
+		if (this.terrain) {
+			this.scene.remove(this.terrain);
+		}
+		this.terrain = terrain;
+		this.scene.add(this.terrain);
+
+		this.renderer.setSize( window.innerWidth, window.innerHeight );
 
 		console.log("graph 3d drawn");
 	}
