@@ -115,6 +115,22 @@ class NodeGraph {
 		return this.nodes.values();
 	}
 
+	triangles() {
+		let tris = [];
+		for (let node of this.nodes.values()) {
+			let right = this.getNode(node.id.add(vec2(1, 0)));
+			let bottom = this.getNode(node.id.add(vec2(0, 1)));
+			let bottomleft = this.getNode(node.id.add(vec2(-1, 1)));
+			if (right && bottom) {
+				tris.push([node, bottom, right]);
+			}
+			if (bottom && bottomleft) {
+				tris.push([node, bottomleft, bottom]);
+			}
+		}
+		return tris;
+	}
+
 	nearest(pos) {
 		let vy = pos.y / this.ns / TRIHEIGHT;
 		let vx = pos.x / this.ns - vy / 2;

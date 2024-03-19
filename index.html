@@ -14,11 +14,18 @@
 <script src="colors.js"></script>
 <script src="elaborate.js"></script>
 <script src="main.js"></script>
+<script src="view3d.js" type="module"></script>
 <link href="style.css" rel="stylesheet" />
 </head>
 <body>
-<canvas id="worldlevel"></canvas>
-<canvas id="partial" hidden></canvas>
+<div id="view3d" class="view3d" hidden>
+	<span class="buttons3d">
+		<button id="close3d">Close</button>
+	</span>
+	<canvas id="world3d"></canvas>
+</div>
+<canvas id="worldlevel" class="canvas2d"></canvas>
+<canvas id="partial" class="canvas2d" hidden></canvas>
 <div id="status"></div>
 <form id="settings" class="settings" action="javascript:void(0);">
 	<label>
@@ -189,6 +196,7 @@
 		<input type="checkbox" name="drawPartial" />
 	</label>
 	<button id="redraw" type="button">Redraw</button>
+	<button id="draw3d" type="button" hidden>Render 3d</button>
 	<br />
 	</label>
 		minimum water in river

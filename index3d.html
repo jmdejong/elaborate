@@ -1,0 +1,227 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>
+	Elaborate
+</title>
+<script src="FastNoiseLite.js"></script>
+<script src="priorityqueue.js"></script>
+<script src="util.js"></script>
+<script src="vec2.js"></script>
+<script src="noise.js"></script>
+<script src="display.js"></script>
+<script src="colors.js"></script>
+<script src="elaborate.js"></script>
+<script src="main3d.js" type="module"></script>
+<!-- <link href="style.css" rel="stylesheet" /> -->
+</head>
+<body>
+<!-- <canvas id="worldlevel"></canvas> -->
+<div id="config" hidden>
+	<div id="status"></div>
+	<form id="settings" class="settings" action="javascript:void(0);">
+		<label>
+			seed
+			<input type="number" name="seed" />
+		</label>
+		<label>
+			size
+			<input type="number" name="size" value="1024" min="1"/>
+		</label>
+		<label>
+			node size
+			<input type="number" name="nodeSize" value="4" min="1"/>
+		</label>
+		<label>
+			node randomness
+			<input type="number" name="nodeRandomness" value="0.9" min="0" step="0.1" />
+		</label>
+		<br />
+
+		<label>
+			feature size
+			<input type="number" name="featureSize" value="300" min="1" />
+		</label>
+		<label>
+			amplitude
+			<input type="number" name="amplitude" value="1" step="0.1"/>
+		</label>
+		<label>
+			base height
+			<input type="number" name="baseHeight" value="0.5" step="0.1" />
+		</label>
+		<label>
+			domain warp size
+			<input type="number" name="warpSize" value="300" min="1" />
+		</label>
+		<label>
+			domain warp effect
+			<input type="number" name="warpEffect" value="60" />
+		</label>
+		<br />
+
+		<label>
+			edge height
+			<input type="number" name="edgeHeight" value="-0.5" step="0.1" />
+		</label>
+		<label>
+			edge percentage of size
+			<input type="number" name="edgePercentage" value="50" />
+		</label>
+		<label>
+			mode
+			<select name="edgeMode">
+				<option value="mult">Multiplicative</option>
+				<option value="add">Additive</option>
+			</select>
+		</label>
+		<label>
+			shape
+			<select name="edgeShape">
+				<option value="parabole">Parabolic</option>
+				<option value="linear">Linear</option>
+			</select>
+		</label>
+		<br />
+
+		<label>
+			plains slope
+			<input type="number" name="plainsSlope" value="0.001" step="0.00001" />
+		</label>
+		<label>
+			lake amount
+			<input type="number" name="lakeAmount" value="0.0" step="0.01" />
+		</label>
+		<label>
+			lake size
+			<input type="number" name="lakeSize" value="100" min="1" />
+		</label>
+		<label>
+			lake depth
+			<input type="number" name="lakeDepth" value="0.1" min="0" step="0.01" />
+		</label>
+		<br />
+
+		<label>
+			detail size
+			<input type="number" name="detailSize" value="30" min="1" />
+		</label>
+		<label>
+			detail amplitude
+			<input type="number" name="detailAmplitude" value="0.02" step="0.01"/>
+		</label>
+		<label>
+			detail factor over iterations
+			<input type="number" name="detailStep" value="1" step="0.01" min="0"/>
+		</label>
+		<br />
+
+		<label>
+			rainfall
+			<input type="number" name="rainfall" value="0.005" step="0.001"/>
+		</label>
+		<label>
+			river cohesion
+			<input type="number" name="cohesion" value="9"/>
+		</label>
+		<label>
+			momentum shrink
+			<input type="number" name="slowing" value="0.9" step="0.001"/>
+		</label>
+		<br />
+
+		<label>
+			base erosion
+			<input type="number" name="baseErosion" value="50" />
+		</label>
+		<label>
+			momentum based erosion
+			<input type="number" name="momentumErosion" value="0" />
+		</label>
+		<label>
+			compensate for iterations
+			<input type="checkbox" name="compensateErosion" checked />
+		</label>
+		<label>
+			erosion factor over iterations
+			<input type="number" name="erosionStep" value="1" step="0.01" min="0"/>
+		</label>
+		<br />
+		<label>
+			deposition
+			<input type="number" name="deposition" value="0.2" step="0.001" min="0" />
+		</label>
+		<label>
+			depth factor
+			<input type="number" name="depositionDepthFactor" value="1" min="0" step="0.01"/>
+		</label>
+		<br />
+
+		<label>
+			iterations
+			<input type="number" name="iterations" value="2" min="0" />
+		</label>
+		<br />
+
+		<label>
+			draw rivers
+			<input type="checkbox" name="drawRivers" checked />
+		</label>
+		<label>
+			draw underwater streams
+			<input type="checkbox" name="drawUnderwaterStreams" checked/>
+		</label>
+		<label>
+			draw circles
+			<input type="checkbox" name="drawCircles" />
+		</label>
+		<label>
+			draw area
+			<input type="checkbox" name="drawArea" checked />
+		</label>
+		<label>
+			height of max color
+			<input type="number" name="colorMax" value="2" step="0.1" min="0" />
+		</label>
+		<label>
+			draw pre-erosion result
+			<input type="checkbox" name="drawPartial" />
+		</label>
+		<button id="redraw" type="button">Redraw</button>
+		<br />
+		</label>
+			minimum water in river
+			<input type="number" name="riverMin" value="1.1" step="0.01" />
+		</label>
+		</label>
+			river width scale
+			<input type="number" name="riverScale" value="0.2" step="0.01" />
+		</label>
+		</label>
+			river width min
+			<input type="number" name="riverMinWidth" value="0.1" step="0.01" />
+		</label>
+		</label>
+			river width max
+			<input type="number" name="riverMaxWidth" value="5" step="0.01" />
+		</label>
+		<br />
+		</label>
+			color scale
+			<input type="text" id="colorscale" name="colorScale" value="#070,#0d0,#7d0,#dc0,#d70,#d30,#f00,#b00,#700,#300,#000" />
+		</label>
+		<br />
+		<canvas id="colorpreview" width=500 height=20></canvas>
+		<br />
+
+		<input type="submit" value="Generate" />
+	</form>
+	<div>
+		<div>#nodes: <span id="nodecount"></span></div>
+		Current settings:
+		<pre id="currentsettings"></pre>
+	</div>
+</div>
+</body>
+</html>

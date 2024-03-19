@@ -1,5 +1,5 @@
 
-canvas {
+.canvas2d {
 	border: 2px solid black;
 	image-rendering: pixelated;
 /* 	background-color: black; */
@@ -21,4 +21,12 @@ input[type=text] {
 label {
 	border: 1px solid #ddd;
 	margin: 1px;
+}
+
+.view3d {
+	position: fixed;
+}
+.buttons3d {
+	position: absolute;
+	right: 10px;
 }
