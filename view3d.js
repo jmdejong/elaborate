@@ -74,10 +74,10 @@ class ThreeView {
 		this.camera.rotation.x = -Math.PI / 3;
 		this.camera.rotation.y = -Math.PI * 3 / 4;
 
-		const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+		const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
 		directionalLight.position.set(0.1, 1, 0.4);
 		this.scene.add(directionalLight);
-		const ambientLight = new THREE.AmbientLight( 0x404040 ); // soft white light
+		const ambientLight = new THREE.AmbientLight(0x88888888);
 		this.scene.add(ambientLight);
 		this.currentGround = null;
 		this.visible = false;
@@ -92,15 +92,38 @@ class ThreeView {
 		this.boostSpeed = settings.boostSpeed;
 		let vertices = [];
 		let colors = []
-		for (let triangle of graph.triangles()) {
-			for (let node of triangle) {
+		let indices = [];
+		if (settings.flatFaces) {
+			for (let triangle of graph.triangles()) {
+				for (let node of triangle) {
+					vertices.push(node.pos.x * settings.horizontalScale, node.height() * settings.heightScale, node.pos.y * settings.horizontalScale);
+					if (node.isSea()) {
+						colors.push(0, 0, 0.9);
+					} else if (node.isWaterBody()) {
+						colors.push(0.2, 0.2, 1);
+					} else {
+						colors.push(...settings.colorScale.rgbFloats(node.height() / settings.colorMax));
+					}
+				}
+			}
+		} else {
+			let nodeIndex = new Map();
+			let i = 0;
+			for (let node of graph.all()) {
 				vertices.push(node.pos.x * settings.horizontalScale, node.height() * settings.heightScale, node.pos.y * settings.horizontalScale);
 				if (node.isSea()) {
-					colors.push(0, 0, 225);
+					colors.push(0, 0, 0.9);
 				} else if (node.isWaterBody()) {
-					colors.push(76, 76, 255);
+					colors.push(0.2, 0.2, 1);
 				} else {
 					colors.push(...settings.colorScale.rgbFloats(node.height() / settings.colorMax));
+				}
+				nodeIndex.set(node.id.hash(), i++);
+			}
+
+			for (let triangle of graph.triangles()) {
+				for (let node of triangle) {
+					indices.push(nodeIndex.get(node.id.hash()));
 				}
 			}
 		}
@@ -108,6 +131,9 @@ class ThreeView {
 		const geometry = new THREE.BufferGeometry();
 		geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
 		geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+		if (!settings.flatFaces) {
+			geometry.setIndex(indices);
+		}
 		geometry.computeBoundingBox();
 		geometry.computeVertexNormals()
 
