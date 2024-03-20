@@ -96,16 +96,18 @@ class ThreeView {
 		let terrain = new THREE.Group()
 
 		let vertices = [];
-		let waterVertices = []
-		let colors = []
+		let colors = [];
+		let waterVertices = [];
+		let waterNormals = [];
 		let indices = [];
 		let nodes = settings.flatFaces ? [...graph.triangles()].flatMap(triangle => triangle) : graph.all();
 		let nodeIndex = new Map();
 		let i = 0;
 		for (let node of nodes) {
 			vertices.push(node.pos.x * settings.horizontalScale, node.baseHeight * settings.heightScale, node.pos.y * settings.horizontalScale);
-			waterVertices.push(node.pos.x * settings.horizontalScale, node.waterHeight * settings.heightScale, node.pos.y * settings.horizontalScale);
 			colors.push(...settings.colorScale.rgbFloats(node.baseHeight / settings.colorMax));
+			waterVertices.push(node.pos.x * settings.horizontalScale, node.waterHeight * settings.heightScale, node.pos.y * settings.horizontalScale);
+			waterNormals.push(0, 1, 0);
 			nodeIndex.set(node.id.hash(), i++);
 		}
 
@@ -117,11 +119,11 @@ class ThreeView {
 
 		const waterGeometry = new THREE.BufferGeometry();
 		waterGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(waterVertices), 3));
+		waterGeometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(waterNormals), 3));
 		if (!settings.flatFaces) {
 			waterGeometry.setIndex(indices);
 		}
 		waterGeometry.computeBoundingBox();
-		waterGeometry.computeVertexNormals()
 		let water = new THREE.Mesh(waterGeometry, new THREE.MeshStandardMaterial({color: 0x0000ff}));
 		water.position.y -= 1e-6;
 		terrain.add(water);
@@ -133,7 +135,7 @@ class ThreeView {
 			geometry.setIndex(indices);
 		}
 		geometry.computeBoundingBox();
-		geometry.computeVertexNormals()
+		geometry.computeVertexNormals();
 
 		let ground = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({vertexColors: true}));
 		terrain.add(ground);
