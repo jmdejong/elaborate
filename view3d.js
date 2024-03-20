@@ -16,9 +16,8 @@ class Input {
 	}
 }
 
-let THREE = null;
-let view = null;
-
+let THREE; // no, we've got a cork
+let view;
 
 class ThreeView {
 
@@ -75,7 +74,7 @@ class ThreeView {
 		this.camera.rotation.y = -Math.PI * 3 / 4;
 
 		const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
-		directionalLight.position.set(0.1, 1, 0.4);
+		directionalLight.position.set(0.1, 1, 1.4);
 		this.scene.add(directionalLight);
 		const ambientLight = new THREE.AmbientLight(0x88888888);
 		this.scene.add(ambientLight);
@@ -83,18 +82,7 @@ class ThreeView {
 		this.visible = false;
 	}
 
-
-	drawWorldGraph(graph) {
-		console.log("drawing graph 3d");
-		let settings = readSettings(document.getElementById("draw3dsettings"));
-		console.log(settings);
-		this.camera.fov = settings.fov
-		this.camera.updateProjectionMatrix();
-		this.movementSpeed = settings.movementSpeed;
-		this.boostSpeed = settings.boostSpeed;
-
-		let terrain = new THREE.Group()
-
+	drawGround(graph, terrain, settings) {
 		let vertices = [];
 		let colors = [];
 		let waterVertices = [];
@@ -104,9 +92,9 @@ class ThreeView {
 		let nodeIndex = new Map();
 		let i = 0;
 		for (let node of nodes) {
-			vertices.push(node.pos.x * settings.horizontalScale, node.baseHeight * settings.heightScale, node.pos.y * settings.horizontalScale);
+			vertices.push(node.pos.x, node.baseHeight, node.pos.y);
 			colors.push(...settings.colorScale.rgbFloats(node.baseHeight / settings.colorMax));
-			waterVertices.push(node.pos.x * settings.horizontalScale, node.waterHeight * settings.heightScale, node.pos.y * settings.horizontalScale);
+			waterVertices.push(node.pos.x, node.waterHeight, node.pos.y);
 			waterNormals.push(0, 1, 0);
 			nodeIndex.set(node.id.hash(), i++);
 		}
@@ -123,10 +111,9 @@ class ThreeView {
 		if (!settings.flatFaces) {
 			waterGeometry.setIndex(indices);
 		}
+		waterGeometry.scale(settings.horizontalScale, settings.heightScale, settings.horizontalScale);
 		waterGeometry.computeBoundingBox();
-		let water = new THREE.Mesh(waterGeometry, new THREE.MeshStandardMaterial({color: 0x0000ff}));
-		water.position.y -= 1e-6;
-		terrain.add(water);
+		terrain.add(new THREE.Mesh(waterGeometry, new THREE.MeshStandardMaterial({color: 0x0000ff})));
 
 		const geometry = new THREE.BufferGeometry();
 		geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
@@ -134,13 +121,67 @@ class ThreeView {
 		if (!settings.flatFaces) {
 			geometry.setIndex(indices);
 		}
+		geometry.scale(settings.horizontalScale, settings.heightScale, settings.horizontalScale);
 		geometry.computeBoundingBox();
 		geometry.computeVertexNormals();
 
-		let ground = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({vertexColors: true}));
-		terrain.add(ground);
+		terrain.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({vertexColors: true})));
+	}
 
+	drawRivers(graph, terrain, settings) {
+		let waterMaterial = new THREE.MeshStandardMaterial({color: 0x7f7fff});
+		for (let node of graph.all()) {
+			if (node.isSink() || !settings.drawUnderwaterStreams && node.isWaterBody()) {
+				continue;
+			}
+			for (let [drain, o] of node.outflow) {
+				let water = node.water * o
+				if (water < settings.riverMin) {
+					continue;
+				}
+				// let start = new THREE.Vector3(node.pos.x, node.height(), node.pos.y);
+				// let end = new THREE.Vector3(drain.pos.x, drain.height(), drain.pos.y)
+				// let width = clamp(
+				// 	Math.sqrt(water)*settings.riverScale,
+				// 	settings.riverMinWidth,
+				// 	settings.riverMaxWidth
+				// );
 
+				let line = new THREE.LineCurve3(
+					new THREE.Vector3(node.pos.x * settings.horizontalScale, node.height() * settings.heightScale, node.pos.y * settings.horizontalScale),
+					new THREE.Vector3(drain.pos.x * settings.horizontalScale, drain.height() * settings.heightScale, drain.pos.y * settings.horizontalScale)
+				);
+				let tube = new THREE.TubeGeometry(
+					line,
+					8,
+					clamp(
+						Math.sqrt(water)*settings.riverScale,
+						settings.riverMinWidth,
+						settings.riverMaxWidth
+					) * settings.horizontalScale,
+					8,
+					false
+				);
+				terrain.add(new THREE.Mesh(tube, waterMaterial));
+			}
+		}
+	}
+
+	drawWorldGraph(graph) {
+		console.log("drawing graph 3d");
+		let settings = readSettings(document.getElementById("draw3dsettings"));
+		console.log(settings);
+		this.camera.fov = settings.fov
+		this.camera.updateProjectionMatrix();
+		this.movementSpeed = settings.movementSpeed;
+		this.boostSpeed = settings.boostSpeed;
+
+		let terrain = new THREE.Group()
+
+		this.drawGround(graph, terrain, settings);
+		this.drawRivers(graph, terrain, settings);
+
+		// terrain.scale.set(settings.horizontalScale, settings.heightScale, settings.horizontalScale);
 		if (settings.centerMesh) {
 			terrain.position.x -= graph.size.x * settings.horizontalScale / 2;
 			terrain.position.z -= graph.size.y * settings.horizontalScale / 2;
