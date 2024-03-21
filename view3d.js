@@ -227,7 +227,7 @@ class ThreeView {
 async function render3d() {
 
 	if (!THREE) {
-		THREE = await import("/three.module.min.js")
+		THREE = await import("./three.module.min.js")
 	}
 	if (!view) {
 		view = new ThreeView();
