@@ -257,7 +257,7 @@ class World {
 		return sorted;
 	}
 
-	drain(nodes, rainfall, cohesion, slowing) {
+	drain(nodes, rainfall, cohesion, slowing, multipleOutflows) {
 		for (let node of nodes) {
 			node.water = 0
 			node.outflow = [];
@@ -270,26 +270,43 @@ class World {
 			}
 			node.water += rainfall * node.size * node.size;
 			let drains = this.graph.drains(node);
-			let total = 0;
 			let nh = node.height();
 			let outflow = [];
-			for (let drain of drains) {
-				let dh = nh - drain.height();
-				if (!(dh >= 0)) {
-					console.log("drain order error", dh, nh, dh);
+
+			if (node.isWaterBody()) {
+				let o = 1.0 / drains.length;
+				for (let drain of drains) {
+					node.outflow.push([drain, o]);
+				}
+			} else if (multipleOutflows) {
+				let total = 0;
+				for (let drain of drains) {
+					let dh = nh - drain.height();
+					if (!(dh >= 0)) {
+						console.log("drain order error", dh, nh, dh);
+					}
+					node.momentum += dh;
+					let o = dh**cohesion;
+					outflow.push([drain, o]);
+					total += o;
+				}
+				node.outflow = outflow.map(([d, o]) => [d, o/total]);
+			} else {
+				let dh = 0;
+				for (let drain of drains) {
+					if (nh - drain.height() > dh) {
+						dh = nh - drain.height();
+						node.outflow = [[drain, 1]];
+					}
 				}
 				node.momentum += dh;
-				let o = node.isWaterBody() ? 1 : dh**cohesion;
-				outflow.push([drain, o]);
-				total += o;
 			}
 			node.momentum *= slowing;
-			node.outflow = outflow.map(([d, o]) => [d, o/total]);
+
 			for (let [drain, o] of node.outflow) {
 				drain.water += node.water * o;
 				drain.momentum += node.momentum * o;
 			}
-
 		}
 	}
 
@@ -346,7 +363,7 @@ async function generate(settings, view) {
 	await view.time("heighten", () => world.heighten(settings.seed^61882, settings.amplitude, settings.featureSize, settings.baseHeight, settings.warpSize, settings.warpEffect));
 	await view.time("cut edge", () => world.cutEdge(settings.edgeHeight, size * 0.005 * settings.edgePercentage, settings.edgeMode == "add", settings.edgeShape == "parabole"));
 	let sorted = await view.time("flow", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, settings.lakeDepth, 0, 0));
-	await view.time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, Math.pow(settings.slowing, settings.nodeSize)));
+	await view.time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, Math.pow(settings.slowing, settings.nodeSize), settings.multipleOutflows));
 	if (settings.drawPartial) {
 		await view.time("draw partial", () => view.drawPartialGraph(graph, settings));
 	} else {
@@ -363,7 +380,7 @@ async function generate(settings, view) {
 		detailFactor *= settings.detailStep;
 		let erosionWeight = Math.pow(settings.erosionStep, i) * erosionScale;
 		sorted = await view.time("flow", () => world.land(settings.plainsSlope, settings.lakeAmount, settings.lakeSize, 1, settings.baseErosion * erosionWeight, settings.momentumErosion * erosionWeight));
-		await view.time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, Math.pow(settings.slowing, settings.nodeSize)));
+		await view.time("drain", () => world.drain(sorted, settings.rainfall, settings.cohesion, Math.pow(settings.slowing, settings.nodeSize), settings.multipleOutflows));
 	}
 	await view.time("amplify water", () => world.amplifyWater());
 	await view.time("draw", () => view.drawWorldGraph(graph, settings));
