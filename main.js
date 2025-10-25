@@ -127,7 +127,80 @@ function readSettings(form) {
 	return settings;
 }
 
+function applyHashParameters() {
+	let formCodes = window.location.hash.slice(1).split(";");
+	for (let formCode of formCodes) {
+		let [formId, formSettings] = formCode.split(":");
+		var form = document.getElementById(formId);
+		if (!(form instanceof HTMLFormElement)) {
+			console.error("Not a form", formId, form);
+			continue;
+		}
+		if (!formSettings) { continue; }
+		for (let formSetting of formSettings.split(",")) {
+			let [name, value] = formSetting.split("=");
+			let input = form.elements[name];
+			if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+				console.error("not an input", name, input);
+				continue;
+			}
+			if (input.type == "checkbox") {
+				input.checked = value == "true";
+			} else {
+				input.value = value
+			}
+		}
+	}
+}
+
+function updateHashParameters() {
+	let changedForms = [];
+	for (let form of document.getElementsByClassName("settings")) {
+		let changedInputs = [];
+		for (let input of form.elements) {
+			if (!input.name) {
+				continue;
+			}
+			if (input instanceof HTMLSelectElement) {
+				let defaultValue = input.options[0].value;
+				for (let option of input.options) {
+					if (option.defaultSelected) {
+						defaultValue = option.value;
+						break;
+					}
+				}
+				if (input.value != defaultValue) {
+					changedInputs.push(input.name + "=" + input.value);
+				}
+			} else if (input.type == "checkbox") {
+				if (input.checked != input.defaultChecked) {
+					changedInputs.push(input.name + "=" + input.checked);
+				}
+			} else {
+				if (input.value != input.defaultValue) {
+					changedInputs.push(input.name + "=" + input.value);
+				}
+			}
+		}
+		if (changedInputs.length > 0) {
+			changedForms.push(form.id + ":" + changedInputs.join(","));
+		}
+	}
+	if (changedForms.length > 0) {
+		window.location.hash = "#" + changedForms.join(";");
+	} else {
+		window.location.hash = "";
+	}
+}
+
+
 function main() {
+	for (let form of document.getElementsByClassName("settings")) {
+		form.addEventListener("change", updateHashParameters);
+	}
+	applyHashParameters();
+	updateHashParameters()
+
 	for (let colorInput of document.getElementsByClassName("colorscale")) {
 		let preview = colorInput.parentElement.getElementsByClassName("colorpreview")[0];
 		colorInput.addEventListener("input", e => ColorScale.fromInput(e.target, preview));
@@ -139,12 +212,16 @@ function main() {
 	let form = document.getElementById("worldsettings");
 	form.addEventListener("submit", e => {
 		generate(readSettings(e.target), view)
+		updateHashParameters()
 	});
 	generate(readSettings(form), view);
 
 	document.getElementById("drawsettings").addEventListener("submit", e => {
 		view.drawWorldGraph(world.graph);
+		updateHashParameters()
 	});
 }
 
+window.addEventListener("hashchange", applyHashParameters)
 window.addEventListener("load", main);
+
